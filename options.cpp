@@ -85,7 +85,13 @@ class _OptionsImpl {
  public:
   _OptionsImpl(int argc, char **argv) {
     AddOptions();
-    po::store(po::parse_command_line(argc, argv, desc_), vm_);
+    // last argument - the midi file
+    pos_desc_.add("midifile", 1);
+    po::store(po::command_line_parser(argc, argv)
+        .options(desc_)
+        .positional(pos_desc_)
+        .run(),
+      vm_);
     po::notify(vm_);
   }
   bool help() const { return vm_.count("help"); }
@@ -94,15 +100,43 @@ class _OptionsImpl {
     oss << desc_;
     return oss.str();
   }
+  bool valid() const {
+    bool v = vm_.count("midifile") > 0;
+    for (const char *key: {"begin", "end", "delay", "batch-duration"}) {
+      v = v && vm_[key].as<OptionMilliSec>().valid_;
+    }
+    return v;
+  }
+  bool info() const { return vm_.count("info"); }
+  bool play() const { return vm_.count("noplay") == 0; }
+  bool progress() const { return vm_.count("progress"); }
+  uint32_t begin_millisec() const { return GetMilli("begin"); }
+  uint32_t end_millisec() const { return GetMilli("end"); }
+  uint32_t delay_millisec() const { return GetMilli("delay"); }
+  uint32_t batch_duration_millisec() const { return GetMilli("batch-duration"); }
+  float tempo() const { return vm_["tempo"].as<float>(); }
+  uint32_t debug() const { return vm_["debug"].as<uint32_t>(); }
+  std::string soundfounts_path() const {
+    return vm_["soundfont"].as<std::string>();
+  }
+  std::string midifile_path() const {
+    return vm_["midifile"].as<std::string>();
+  }
  private:
   void AddOptions();
+  uint32_t GetMilli(const char *key) const {
+    return vm_[key].as<OptionMilliSec>().ms_;
+  }
   po::options_description desc_;
+  po::positional_options_description pos_desc_;
   po::variables_map vm_;
 };
 
 void _OptionsImpl::AddOptions() {
   desc_.add_options()
     ("help,h", "produce help message")
+    ("midifile", po::value<std::string>(),
+       "Positional argument. Path the midi file to be played")
     ("begin,b", 
       po::value<OptionMilliSec>()->default_value(OptionMilliSec{true, 0}),
       "start time [minutes]:seconds[.millisecs]")
@@ -113,7 +147,7 @@ void _OptionsImpl::AddOptions() {
     ("delay", 
       po::value<OptionMilliSec>()->default_value(OptionMilliSec{true, 200}),
       "Initial extra playing delay in [minutes]:seconds[.millisecs]")
-    ("batch-duration,b", 
+    ("batch-duration", 
       po::value<OptionMilliSec>()->default_value(OptionMilliSec{true, 10000}),
       "sequencer batch duration in [minutes]:seconds[.millisecs]")
     ("tempo,T",
@@ -131,6 +165,7 @@ void _OptionsImpl::AddOptions() {
   ;
 }
 
+// ========================================================================
 
 Options::Options(int argc, char **argv) :
   p_{new _OptionsImpl(argc, argv)} {
@@ -140,10 +175,59 @@ Options::~Options() {
   delete p_;
 }
 
+std::string Options::description() const {
+  return p_->description();
+}
+
+bool Options::valid() const {
+  return p_->valid();
+}
+
 bool Options::help() const {
   return p_->help();
 }
 
-std::string Options::description() const {
-  return p_->description();
+bool Options::info() const {
+  return p_->info();
 }
+
+bool Options::play() const {
+  return p_->play();
+}
+
+bool Options::progress() const {
+  return p_->progress();
+}
+
+uint32_t Options::begin_millisec() const {
+  return p_->begin_millisec();
+}
+
+uint32_t Options::end_millisec() const {
+  return p_->end_millisec();
+}
+
+uint32_t Options::delay_millisec() const {
+  return p_->delay_millisec();
+}
+
+uint32_t Options::batch_duration_millisec() const {
+  return p_->batch_duration_millisec();
+}
+
+float Options::tempo() const {
+  return p_->tempo();
+}
+
+uint32_t Options::debug() const {
+  return p_->debug();
+}
+
+std::string Options::midifile_path() const {
+  return p_->midifile_path();
+}
+
+std::string Options::soundfounts_path() const {
+  return p_->soundfounts_path();
+}
+

@@ -20,7 +20,12 @@ int main(int argc, char **argv) {
   Options options(argc, argv);
   if (options.help()) {
     std::cout << options.description();
+  } else if (!options.valid()) {
+    std::cerr << options.description();
   } else {
+    std::cout << fmt::format("b={}, e={}\n",
+      options.begin_millisec(), options.end_millisec());
+    std::cout << fmt::format("mf={}\n", options.midifile_path());
     InitSynth();
   }
   return rc;

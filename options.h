@@ -11,7 +11,7 @@ class Options {
   Options(int argc, char **argv);
   ~Options();
   std::string description() const;
-  bool ok() const;
+  bool valid() const;
   bool help() const;
   bool info() const;
   bool play() const;
@@ -21,7 +21,7 @@ class Options {
   uint32_t delay_millisec() const;
   uint32_t batch_duration_millisec() const;
   float tempo() const;
-  uint32_t debug(); // flags
+  uint32_t debug() const; // flags
   std::string midifile_path() const;
   std::string soundfounts_path() const;
  private:
