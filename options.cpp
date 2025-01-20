@@ -110,9 +110,23 @@ void _OptionsImpl::AddOptions() {
        po::value<OptionMilliSec>()->default_value(
          OptionMilliSec{true, INFINITE_MINUTES_MILLIES}),
        "end time [minutes]:seconds[.millisecs]")
+    ("delay", 
+      po::value<OptionMilliSec>()->default_value(OptionMilliSec{true, 200}),
+      "Initial extra playing delay in [minutes]:seconds[.millisecs]")
+    ("batch-duration,b", 
+      po::value<OptionMilliSec>()->default_value(OptionMilliSec{true, 10000}),
+      "sequencer batch duration in [minutes]:seconds[.millisecs]")
     ("tempo,T",
        po::value<float>()->default_value(1.),
        "Speed Multiplier factor")
+    ("soundfont,s",
+       po::value<std::string>()->default_value(
+         "/usr/share/sounds/sf2/FluidR3_GM.sf2"),
+       "Path to sound fonts file")
+    ("info", po::bool_switch()->default_value(false),
+       "print general information of the midi file")
+    ("noplay", po::bool_switch()->default_value(false), "Suppress playing")
+    ("progress", po::bool_switch()->default_value(false), "show progress")
     ("debug", po::value<std::string>()->default_value("0"), "Debug flags")
   ;
 }
