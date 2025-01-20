@@ -25,6 +25,7 @@ include_directories(
 set(SOURCE_FILES
     main.cpp
     options.cpp
+    synthseq.cpp
 )
 
 # Add the executable target
