@@ -35,4 +35,22 @@ SynthSequencer::SynthSequencer(const std::string &sound_font_path) {
 }
 
 SynthSequencer::~SynthSequencer() {
+  if (synth_seq_id_ != -1) {
+    fluid_sequencer_unregister_client(sequencer_, synth_seq_id_);
+  }
+  if (sequencer_) {
+    delete_fluid_sequencer(sequencer_);
+  }
+  if (audio_driver_) {
+    delete_fluid_audio_driver(audio_driver_);
+  }
+  if (sfont_id_ != -1) {
+    fluid_synth_sfunload(synth_, sfont_id_, 0);
+  }
+  if (synth_) {
+    delete_fluid_synth(synth_);
+  }
+  if (settings_) {
+    delete_fluid_settings(settings_);
+  }
 }
