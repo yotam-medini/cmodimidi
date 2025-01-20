@@ -7,7 +7,16 @@ namespace po = boost::program_options;
 
 void add_options(po::options_description &desc) {
   desc.add_options()
-    ("help", "produce help message")
+    ("help,h", "produce help message")
+    ("begin,b", 
+      po::value<std::string>()->default_value("0:00"),
+      "start time [minutes]:seconds[.millisecs]")
+    ("end,e",
+       po::value<std::string>()->default_value(""),
+       "end time [minutes]:seconds[.millisecs]")
+    ("tempo,T",
+       po::value<float>()->default_value(1.),
+       "Speed Multiplier factor")
     ("debug", po::value<std::string>()->default_value("0"), "Debug flags")
   ;
 }
@@ -26,9 +35,15 @@ void InitSynth() {
 int main(int argc, char **argv) {
   int rc = 0;
   std::cout << fmt::format("Hello argc={}\n", argc);
-  po::variables_map vm;
   po::options_description desc("modimidi options");
   add_options(desc);
-  InitSynth();
+  po::variables_map vm;
+  po::store(po::parse_command_line(argc, argv, desc), vm);
+  po::notify(vm);
+  if (vm.count("help")) {
+    std::cout << desc;
+  } else {
+    InitSynth();
+  }
   return rc;
 }

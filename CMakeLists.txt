@@ -24,7 +24,7 @@ include_directories(
 # Set the source files
 set(SOURCE_FILES
     main.cpp
-    # Add other source files here
+    options.cpp
 )
 
 # Add the executable target
