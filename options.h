@@ -23,7 +23,7 @@ class Options {
   float tempo() const;
   uint32_t debug() const; // flags
   std::string midifile_path() const;
-  std::string soundfounts_path() const;
+  std::string soundfonts_path() const;
  private:
   Options() = delete;
   class _OptionsImpl *p_{nullptr};

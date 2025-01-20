@@ -116,7 +116,7 @@ class _OptionsImpl {
   uint32_t batch_duration_millisec() const { return GetMilli("batch-duration"); }
   float tempo() const { return vm_["tempo"].as<float>(); }
   uint32_t debug() const { return vm_["debug"].as<uint32_t>(); }
-  std::string soundfounts_path() const {
+  std::string soundfonts_path() const {
     return vm_["soundfont"].as<std::string>();
   }
   std::string midifile_path() const {
@@ -227,7 +227,7 @@ std::string Options::midifile_path() const {
   return p_->midifile_path();
 }
 
-std::string Options::soundfounts_path() const {
-  return p_->soundfounts_path();
+std::string Options::soundfonts_path() const {
+  return p_->soundfonts_path();
 }
 
