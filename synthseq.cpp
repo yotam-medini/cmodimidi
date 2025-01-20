@@ -40,17 +40,21 @@ SynthSequencer::~SynthSequencer() {
   }
   if (sequencer_) {
     delete_fluid_sequencer(sequencer_);
+    sequencer_ = nullptr;
   }
   if (audio_driver_) {
     delete_fluid_audio_driver(audio_driver_);
+    audio_driver_ = nullptr;
   }
   if (sfont_id_ != -1) {
     fluid_synth_sfunload(synth_, sfont_id_, 0);
   }
   if (synth_) {
     delete_fluid_synth(synth_);
+    synth_ = nullptr;
   }
   if (settings_) {
     delete_fluid_settings(settings_);
+    settings_ = nullptr;
   }
 }
