@@ -8,6 +8,10 @@ namespace fs = std::filesystem;
 
 namespace midi {
 
+std::string TextBaseEvent::str() const {
+  return fmt::format("{}({})", event_type_name(), s_);
+}
+
 Midi::Midi(const std::string &midifile_path, uint32_t debug) :
   debug_{debug} {
   GetData(midifile_path);
@@ -85,6 +89,7 @@ void Midi::ParseHeader() {
        ticks_per_quarter_note_ =
          (0x100 - uint16_t{data_[12]}) * uint16_t{data_[13]};
      }
+     parse_state_.offset_ += length;
      if (debug_ & 0x1) {
        std::cout << fmt::format(
          "ticks_per_quarter_note={} ticks_per_frame={}\n",
@@ -108,6 +113,53 @@ void Midi::ReadTrack() {
   }
   const size_t length = GetNextSize();
   const size_t offset_eot = parse_state_.offset_ + length;
+  tracks_.push_back(Track());
+  auto &events = tracks_.back().events_;
+  bool got_eot = false;
+  while ((!got_eot) && (parse_state_.offset_ < offset_eot)) {
+    auto event = GetTrackEvent();
+    events.push_back(std::move(event));
+  }
+}
+
+std::unique_ptr<Event> Midi::GetTrackEvent() {
+  uint32_t delta_time = GetVariableLengthQuantity();
+  uint8_t event_first_byte = data_[parse_state_.offset_++];
+  std::unique_ptr<Event> e;
+  switch (event_first_byte) {
+   case 0xff:
+    e = GetMetaEvent();
+    break;
+   case 0xf0:
+   case 0xf7:
+     std::cerr << "Sysex Event ignored\n";
+    break;
+   default:
+    e = GetMidiEvent();
+  }
+  return e;
+}
+
+std::unique_ptr<MetaEvent> Midi::GetMetaEvent() {
+  std::unique_ptr<MetaEvent> e;
+  uint32_t length;
+  std::string text;
+  uint8_t meta_first_byte = data_[parse_state_.offset_++];
+  switch (meta_first_byte) {
+   case 0x03:
+     length = GetVariableLengthQuantity();
+     text = GetString(length);
+     e = std::make_unique<TextEvent>(text);
+   break;
+   default:
+    error_ = fmt::format("Meta event unsupported byte={:02x}", meta_first_byte);
+  }
+  return e;
+}
+
+std::unique_ptr<MidiEvent> Midi::GetMidiEvent() {
+  std::unique_ptr<MidiEvent> e;
+  return e;
 }
 
 size_t Midi::GetNextSize() {

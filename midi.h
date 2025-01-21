@@ -19,6 +19,38 @@ class Event {
  public:
   Event() {}
   virtual ~Event() {}
+  virtual std::string str() const { return ""; }
+};
+
+class MetaEvent : public Event {
+ public:
+  MetaEvent() {}
+  virtual ~MetaEvent() {}
+  virtual std::string str() const { return ""; }
+};
+
+class MidiEvent : public Event {
+ public:
+  MidiEvent() {}
+  virtual ~MidiEvent() {}
+  virtual std::string str() const { return ""; }
+};
+
+class TextBaseEvent : public MetaEvent {
+ public:
+  TextBaseEvent(const std::string& s="") : s_{s} {}
+  virtual ~TextBaseEvent() {}
+  virtual std::string str() const;
+  virtual std::string event_type_name() const = 0;
+  std::string s_;
+};
+
+class TextEvent : public TextBaseEvent {
+ public:
+  TextEvent(const std::string& s="") : TextBaseEvent{s} {}
+  virtual ~TextEvent() {}
+  std::string event_type_name() const { return "Text"; }
+  std::string s_;
 };
 
 class Track {
@@ -41,6 +73,9 @@ class Midi {
   void ReadOneTrack() { ReadTrack(); }
   void ReadTracks();
   void ReadTrack();
+  std::unique_ptr<Event> GetTrackEvent();
+  std::unique_ptr<MetaEvent> GetMetaEvent();
+  std::unique_ptr<MidiEvent> GetMidiEvent();
   size_t GetNextSize();
   size_t GetVariableLengthQuantity();
   std::string GetString(size_t length);
