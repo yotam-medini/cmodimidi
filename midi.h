@@ -17,6 +17,14 @@ enum MetaVarByte : uint8_t {
   LYRICS_x05    = 0x05,
   MARK_x06      = 0x06,
   DEVICE_x09    = 0x09,
+  CHANPFX_x20   = 0x20,
+  PORT_x21      = 0x21,
+  ENDTRACK_x2f  = 0x2f,
+  TEMPO_x51     = 0x51,
+  SMPTE_x54     = 0x54,
+  TIMESIGN_x58  = 0x58,
+  KEYSIGN_x59   = 0x59,
+  SEQUEMCER_x7f = 0x7f,
 };
 
 class ParseState {
@@ -126,6 +134,93 @@ class DeviceEvent : public TextBaseEvent { // 0xff 0x09
   virtual ~DeviceEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::DEVICE_x09; }
   std::string event_type_name() const { return "Device"; }
+};
+
+class ChannelPrefixEvent : public MetaEvent { // 0xff 0x20
+ public:
+  ChannelPrefixEvent(uint32_t dt, uint8_t channel) :
+    MetaEvent{dt}, channel_{channel} {}
+  virtual ~ChannelPrefixEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::CHANPFX_x20; }
+  uint8_t channel_;
+};
+
+class PortEvent : public MetaEvent { // 0xff 0x21
+ public:
+  PortEvent(uint32_t dt, uint8_t port) : MetaEvent{dt}, port_{port} {}
+  virtual ~PortEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::PORT_x21; }
+  uint8_t port_;
+};
+
+class EndOfTrackEvent : public MetaEvent { // 0xff 0x2f
+ public:
+  EndOfTrackEvent(uint32_t dt) : MetaEvent{dt}  {}
+  virtual ~EndOfTrackEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::ENDTRACK_x2f; }
+};
+
+class TempoEvent : public MetaEvent { // 0xff 0x51
+ public:
+  TempoEvent(uint32_t dt, uint32_t tttttt) : MetaEvent{dt}, tttttt_{tttttt}  {}
+  virtual ~TempoEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::TEMPO_x51; }
+  uint32_t tttttt_;
+};
+
+class SmpteOffsetEvent : public MetaEvent { // 0xff 0x54
+ public:
+  SmpteOffsetEvent(
+    uint32_t dt, 
+    uint8_t hr,
+    uint8_t mn,
+    uint8_t se,
+    uint8_t fr,
+    uint8_t ff) :
+     MetaEvent{dt}, hr_{hr}, mn_{mn}, se_{se}, fr_{fr}, ff_{ff} {}
+  virtual ~SmpteOffsetEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::SMPTE_x54; }
+  uint8_t hr_;
+  uint8_t mn_;
+  uint8_t se_;
+  uint8_t fr_;
+  uint8_t ff_;
+};
+
+class TimeSignatureEvent : public MetaEvent { // 0xff 0x58
+ public:
+  TimeSignatureEvent(
+    uint32_t dt,
+    uint8_t nn,
+    uint8_t dd,
+    uint8_t cc,
+    uint8_t bb) : 
+    MetaEvent{dt}, nn_{nn}, dd_{dd}, cc_{cc}, bb_{bb} {}
+  virtual ~TimeSignatureEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::TIMESIGN_x58; }
+  uint8_t nn_;
+  uint8_t dd_;
+  uint8_t cc_;
+  uint8_t bb_;
+};
+
+class KeySignatureEvent : public MetaEvent { // 0xff 0x59
+ public:
+  KeySignatureEvent(uint32_t dt, uint16_t sf, bool mi) : 
+    MetaEvent{dt}, sf_{sf}, mi_{mi} {}
+  virtual ~KeySignatureEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::KEYSIGN_x59; }
+  uint16_t sf_;
+  bool mi_;
+};
+
+class SequencerEvent : public MetaEvent { // 0xff 0x7f
+ public:
+  SequencerEvent(uint32_t dt, const std::vector<uint8_t> &data) : 
+    MetaEvent{dt}, data_{data} {}
+  virtual ~SequencerEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::SEQUEMCER_x7f; }
+  std::vector<uint8_t> data_;
 };
 
 // End of Meta Events 
