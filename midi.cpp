@@ -71,9 +71,9 @@ void Midi::ParseHeader() {
      if (length != 6) {
        std::cerr << fmt::format("Unexpected length: {} != 6\n", length);
      }
-     format_ = (uint16_t{data_[8]} << 8) | uint16_t{data_[9]};
-     ntrks_ = (uint16_t{data_[10]} << 8) | uint16_t{data_[11]};
-     division_ = (uint16_t{data_[12]} << 8) | uint16_t{data_[13]};
+     format_ = GetU16from(8);
+     ntrks_ = GetU16from(10);
+     division_ = GetU16from(12);
      if (debug_ & 0x1) {
        std::cout << fmt::format("length={}, format={}, ntrks={}, "
          "division={:018b}\n",
@@ -146,6 +146,18 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent() {
   std::string text;
   uint8_t meta_first_byte = data_[parse_state_.offset_++];
   switch (meta_first_byte) {
+   case 0x00:
+     length = data_[parse_state_.offset_++];
+     if (length != 2) {
+       std::cerr << fmt::format("Unexpected length={}!=2 in SequenceNumber",
+         length);
+     }
+     {
+       uint16_t number = GetU16from(parse_state_.offset_);
+       e = std::make_unique<SequenceNumberEvent>(number);
+     }
+     parse_state_.offset_ += length;
+   break;
    case 0x03:
      length = GetVariableLengthQuantity();
      text = GetString(length);
@@ -185,6 +197,11 @@ size_t Midi::GetVariableLengthQuantity() {
   }
   parse_state_.offset_ = offs;
   return quantity;
+}
+
+uint16_t Midi::GetU16from(size_t from) const {
+  uint16_t ret = (uint16_t{data_[from]} << 8) | uint16_t{data_[from + 1]};
+  return ret;
 }
 
 std::string Midi::GetString(size_t length) {

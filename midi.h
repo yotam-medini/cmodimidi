@@ -36,6 +36,15 @@ class MidiEvent : public Event {
   virtual std::string str() const { return ""; }
 };
 
+////////////////////////////////////////////////////////////////////////
+// Meta Events 
+
+class SequenceNumberEvent : public MetaEvent { // 0xff 0x01
+ public:
+  SequenceNumberEvent(uint16_t number) : number_{number_} {}
+  uint16_t number_;
+};
+
 class TextBaseEvent : public MetaEvent {
  public:
   TextBaseEvent(const std::string& s="") : s_{s} {}
@@ -45,13 +54,64 @@ class TextBaseEvent : public MetaEvent {
   std::string s_;
 };
 
-class TextEvent : public TextBaseEvent {
+class TextEvent : public TextBaseEvent { // 0xff 0x01
  public:
   TextEvent(const std::string& s="") : TextBaseEvent{s} {}
   virtual ~TextEvent() {}
   std::string event_type_name() const { return "Text"; }
-  std::string s_;
 };
+
+class CopyrightEvent : public TextBaseEvent { // 0xff 0x02
+ public:
+  CopyrightEvent(const std::string& s="") : TextBaseEvent{s} {}
+  virtual ~CopyrightEvent() {}
+  std::string event_type_name() const { return "Copyright"; }
+};
+
+class SequenceTrackNameEvent : public TextBaseEvent { // 0xff 0x03
+ public:
+  SequenceTrackNameEvent(const std::string& s="") : TextBaseEvent{s} {}
+  virtual ~SequenceTrackNameEvent() {}
+  std::string event_type_name() const { return "SequenceTrackName"; }
+};
+
+class InstrumentNameEvent : public TextBaseEvent { // 0xff 0x04
+ public:
+  InstrumentNameEvent(const std::string& s="") : TextBaseEvent{s} {}
+  virtual ~InstrumentNameEvent() {}
+  std::string event_type_name() const { return "InstrumentName"; }
+};
+
+class LyricEvent : public TextBaseEvent { // 0xff 0x05
+ public:
+  LyricEvent(const std::string& s="") : TextBaseEvent{s} {}
+  virtual ~LyricEvent() {}
+  std::string event_type_name() const { return "Lyric"; }
+};
+
+class MarkerEvent : public TextBaseEvent { // 0xff 0x06
+ public:
+  MarkerEvent(const std::string& s="") : TextBaseEvent{s} {}
+  virtual ~MarkerEvent() {}
+  std::string event_type_name() const { return "Marker"; }
+};
+
+class DeviceEvent : public TextBaseEvent { // 0xff 0x09
+ public:
+  DeviceEvent(const std::string& s="") : TextBaseEvent{s} {}
+  virtual ~DeviceEvent() {}
+  std::string event_type_name() const { return "Device"; }
+};
+
+// End of Meta Events 
+////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////
+// Midi Events 
+
+// End of Midi Events 
+////////////////////////////////////////////////////////////////////////
+
 
 class Track {
  public:
@@ -78,6 +138,7 @@ class Midi {
   std::unique_ptr<MidiEvent> GetMidiEvent();
   size_t GetNextSize();
   size_t GetVariableLengthQuantity();
+  uint16_t GetU16from(size_t from) const;
   std::string GetString(size_t length);
   std::string GetChunkType() { return GetString(4); }
   std::string error_;
