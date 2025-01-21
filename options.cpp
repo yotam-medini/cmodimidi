@@ -1,7 +1,9 @@
 #include "options.h"
 #include <charconv>
+#include <iostream>
 #include <limits>
 #include <sstream>
+#include <fmt/core.h>
 #include <boost/program_options.hpp>
 
 static uint32_t MINUTE_MILLIES = 60000;
@@ -10,8 +12,9 @@ static uint32_t INFINITE_MINUTES_MILLIES = MINUTE_MILLIES *
 
 namespace po = boost::program_options;
 
-static int StrToInt(const std::string &s, int defval) {
-  int n;
+template <typename T>
+static int StrToInt(const std::string &s, T defval) {
+  T n;
   auto [_, ec] = std::from_chars(s.data(), s.data() + s.size(), n);
   if (ec != std::errc()) {
     n = defval;
@@ -102,8 +105,14 @@ class _OptionsImpl {
   }
   bool valid() const {
     bool v = vm_.count("midifile") > 0;
+    if (!v) { std::cerr << "Missing midifile\n"; }
     for (const char *key: {"begin", "end", "delay", "batch-duration"}) {
-      v = v && vm_[key].as<OptionMilliSec>().valid_;
+      if (v) {
+        v = vm_[key].as<OptionMilliSec>().valid_;
+        if (!v) {
+          std::cerr << fmt::format("Bad value for {}\n", key);
+        }
+      }
     }
     return v;
   }
@@ -115,7 +124,11 @@ class _OptionsImpl {
   uint32_t delay_millisec() const { return GetMilli("delay"); }
   uint32_t batch_duration_millisec() const { return GetMilli("batch-duration"); }
   float tempo() const { return vm_["tempo"].as<float>(); }
-  uint32_t debug() const { return vm_["debug"].as<uint32_t>(); }
+  uint32_t debug() const {
+    auto raw = vm_["debug"].as<std::string>();
+    uint32_t flags = std::stoi(raw, nullptr, 0);
+    return flags;
+  }
   std::string soundfonts_path() const {
     return vm_["soundfont"].as<std::string>();
   }
