@@ -2,7 +2,8 @@
 
 namespace midi {
 
-Midi::Midi() {
+Midi::Midi(const std::string &midifile_path, uint32_t debug) :
+  debug_{debug_} {
 }
   
 }
