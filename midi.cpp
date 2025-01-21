@@ -128,19 +128,19 @@ std::unique_ptr<Event> Midi::GetTrackEvent() {
   std::unique_ptr<Event> e;
   switch (event_first_byte) {
    case 0xff:
-    e = GetMetaEvent();
+    e = GetMetaEvent(delta_time);
     break;
    case 0xf0:
    case 0xf7:
      std::cerr << "Sysex Event ignored\n";
     break;
    default:
-    e = GetMidiEvent();
+    e = GetMidiEvent(delta_time);
   }
   return e;
 }
 
-std::unique_ptr<MetaEvent> Midi::GetMetaEvent() {
+std::unique_ptr<MetaEvent> Midi::GetMetaEvent(uint32_t delta_time) {
   std::unique_ptr<MetaEvent> e;
   uint32_t length;
   std::string text;
@@ -154,7 +154,7 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent() {
     }
     {
       uint16_t number = GetU16from(parse_state_.offset_);
-      e = std::make_unique<SequenceNumberEvent>(number);
+      e = std::make_unique<SequenceNumberEvent>(delta_time, number);
     }
     parse_state_.offset_ += length;
    break;
@@ -169,25 +169,25 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent() {
     text = GetString(length);
     switch (meta_first_byte) {
      case 0x01:
-      e = std::make_unique<TextEvent>(text);
+      e = std::make_unique<TextEvent>(delta_time, text);
       break;
      case 0x02:
-      e = std::make_unique<CopyrightEvent>(text);
+      e = std::make_unique<CopyrightEvent>(delta_time, text);
       break;
      case 0x03:
-      e = std::make_unique<SequenceTrackNameEvent>(text);
+      e = std::make_unique<SequenceTrackNameEvent>(delta_time, text);
       break;
      case 0x04:
-      e = std::make_unique<InstrumentNameEvent>(text);
+      e = std::make_unique<InstrumentNameEvent>(delta_time, text);
       break;
      case 0x05:
-      e = std::make_unique<LyricEvent>(text);
+      e = std::make_unique<LyricEvent>(delta_time, text);
       break;
      case 0x06:
-      e = std::make_unique<MarkerEvent>(text);
+      e = std::make_unique<MarkerEvent>(delta_time, text);
       break;
      case 0x09:
-      e = std::make_unique<DeviceEvent>(text);
+      e = std::make_unique<DeviceEvent>(delta_time, text);
       break;
      default:
       error_ = fmt::format("BUG meta_first_byte={:0x2}", meta_first_byte);
@@ -199,7 +199,7 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent() {
   return e;
 }
 
-std::unique_ptr<MidiEvent> Midi::GetMidiEvent() {
+std::unique_ptr<MidiEvent> Midi::GetMidiEvent(uint32_t delta_time) {
   std::unique_ptr<MidiEvent> e;
   return e;
 }
