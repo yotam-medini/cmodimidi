@@ -146,7 +146,7 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent(uint32_t delta_time) {
   std::string text;
   uint8_t meta_first_byte = data_[parse_state_.offset_++];
   switch (meta_first_byte) {
-   case 0x00:
+   case MetaVarByte::SEQNUM_x00:
     length = data_[parse_state_.offset_++];
     if (length != 2) {
       std::cerr << fmt::format("Unexpected length={}!=2 in SequenceNumber",
@@ -158,35 +158,35 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent(uint32_t delta_time) {
     }
     parse_state_.offset_ += length;
    break;
-   case 0x01:
-   case 0x02:
-   case 0x03:
-   case 0x04:
-   case 0x05:
-   case 0x06:
-   case 0x09:
+   case MetaVarByte::TEXT_x01:
+   case MetaVarByte::COPYRIGHT_x02:
+   case MetaVarByte::TRACKNAME_x03:
+   case MetaVarByte::INSTRNAME_x04:
+   case MetaVarByte::LYRICS_x05:
+   case MetaVarByte::MARK_x06:
+   case MetaVarByte::DEVICE_x09:
     length = GetVariableLengthQuantity();
     text = GetString(length);
     switch (meta_first_byte) {
-     case 0x01:
+     case MetaVarByte::TEXT_x01:
       e = std::make_unique<TextEvent>(delta_time, text);
       break;
-     case 0x02:
+     case MetaVarByte::COPYRIGHT_x02:
       e = std::make_unique<CopyrightEvent>(delta_time, text);
       break;
-     case 0x03:
+     case MetaVarByte::TRACKNAME_x03:
       e = std::make_unique<SequenceTrackNameEvent>(delta_time, text);
       break;
-     case 0x04:
+     case MetaVarByte::INSTRNAME_x04:
       e = std::make_unique<InstrumentNameEvent>(delta_time, text);
       break;
-     case 0x05:
+     case MetaVarByte::LYRICS_x05:
       e = std::make_unique<LyricEvent>(delta_time, text);
       break;
-     case 0x06:
+     case MetaVarByte::MARK_x06:
       e = std::make_unique<MarkerEvent>(delta_time, text);
       break;
-     case 0x09:
+     case MetaVarByte::DEVICE_x09:
       e = std::make_unique<DeviceEvent>(delta_time, text);
       break;
      default:

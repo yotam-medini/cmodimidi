@@ -8,6 +8,17 @@
 
 namespace midi {
 
+enum MetaVarByte : uint8_t {
+  SEQNUM_x00    = 0x00,
+  TEXT_x01      = 0x01,
+  COPYRIGHT_x02 = 0x02,
+  TRACKNAME_x03 = 0x03,
+  INSTRNAME_x04 = 0x04,
+  LYRICS_x05    = 0x05,
+  MARK_x06      = 0x06,
+  DEVICE_x09    = 0x09,
+};
+
 class ParseState {
  public:
   size_t offset_{0};
@@ -26,7 +37,8 @@ class Event {
 class MetaEvent : public Event {
  public:
   MetaEvent(uint32_t dt) : Event{dt} {}
-  virtual ~MetaEvent() {}
+  virtual ~MetaEvent() {} 
+  virtual MetaVarByte VarByte() const = 0;
   virtual std::string str() const { return ""; }
 };
 
@@ -45,6 +57,7 @@ class SequenceNumberEvent : public MetaEvent { // 0xff 0x01
   SequenceNumberEvent(uint32_t dt, uint16_t number) :
     MetaEvent{dt},
     number_{number_} {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::SEQNUM_x00; }
   uint16_t number_;
 };
 
@@ -61,6 +74,7 @@ class TextEvent : public TextBaseEvent { // 0xff 0x01
  public:
   TextEvent(uint32_t dt, const std::string& s="") : TextBaseEvent{dt, s} {}
   virtual ~TextEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::TEXT_x01; }
   std::string event_type_name() const { return "Text"; }
 };
 
@@ -68,6 +82,7 @@ class CopyrightEvent : public TextBaseEvent { // 0xff 0x02
  public:
   CopyrightEvent(uint32_t dt, const std::string& s="") : TextBaseEvent{dt, s} {}
   virtual ~CopyrightEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::COPYRIGHT_x02; }
   std::string event_type_name() const { return "Copyright"; }
 };
 
@@ -76,6 +91,7 @@ class SequenceTrackNameEvent : public TextBaseEvent { // 0xff 0x03
   SequenceTrackNameEvent(uint32_t dt, const std::string& s="") :
     TextBaseEvent{dt, s} {}
   virtual ~SequenceTrackNameEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::TRACKNAME_x03; }
   std::string event_type_name() const { return "SequenceTrackName"; }
 };
 
@@ -84,6 +100,7 @@ class InstrumentNameEvent : public TextBaseEvent { // 0xff 0x04
   InstrumentNameEvent(uint32_t dt, const std::string& s="") :
     TextBaseEvent{dt, s} {}
   virtual ~InstrumentNameEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::INSTRNAME_x04; }
   std::string event_type_name() const { return "InstrumentName"; }
 };
 
@@ -91,6 +108,7 @@ class LyricEvent : public TextBaseEvent { // 0xff 0x05
  public:
   LyricEvent(uint32_t dt, const std::string& s="") : TextBaseEvent{dt, s} {}
   virtual ~LyricEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::LYRICS_x05; }
   std::string event_type_name() const { return "Lyric"; }
 };
 
@@ -98,6 +116,7 @@ class MarkerEvent : public TextBaseEvent { // 0xff 0x06
  public:
   MarkerEvent(unsigned dt, const std::string& s="") : TextBaseEvent{dt, s} {}
   virtual ~MarkerEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::MARK_x06; }
   std::string event_type_name() const { return "Marker"; }
 };
 
@@ -105,6 +124,7 @@ class DeviceEvent : public TextBaseEvent { // 0xff 0x09
  public:
   DeviceEvent(uint32_t dt, const std::string& s="") : TextBaseEvent{dt, s} {}
   virtual ~DeviceEvent() {}
+  virtual MetaVarByte VarByte() const { return MetaVarByte::DEVICE_x09; }
   std::string event_type_name() const { return "Device"; }
 };
 
