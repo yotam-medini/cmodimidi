@@ -41,6 +41,10 @@ void Midi::GetData(const std::string &midifile_path) {
 }
 
 void Midi::Parse() {
+  ParseHeader();
+}
+
+void Midi::ParseHeader() {
   static const std::string MThd{"MThd"};
   const std::string header = GetChunkType();
   if (header != MThd) {
@@ -48,11 +52,31 @@ void Midi::Parse() {
   }
   if (Valid()) {
      size_t length = GetNextSize();
+     if (length != 6) {
+       std::cerr << fmt::format("Unexpected length: {} != 6\n", length);
+     }
      format_ = (uint16_t{data_[8]} << 8) | uint16_t{data_[9]};
      ntrks_ = (uint16_t{data_[10]} << 8) | uint16_t{data_[11]};
+     division_ = (uint16_t{data_[12]} << 8) | uint16_t{data_[13]};
      if (debug_ & 0x1) {
-       std::cout << fmt::format("length={}, format={}, ntrks={}\n",
-         length, format_, ntrks_);
+       std::cout << fmt::format("length={}, format={}, ntrks={}, "
+         "division={:018b}\n",
+         length, format_, ntrks_, division_);
+     }
+     uint16_t bit15 = division_ >> 15;
+     if (bit15 == 0) {
+       ticks_per_quarter_note_ = division_;
+     } else {
+       negative_smpte_format_ = data_[12] & 0x7f;
+       ticks_per_frame_ = data_[13];
+       // hack
+       ticks_per_quarter_note_ =
+         (0x100 - uint16_t{data_[12]}) * uint16_t{data_[13]};
+     }
+     if (debug_ & 0x1) {
+       std::cout << fmt::format(
+         "ticks_per_quarter_note={} ticks_per_frame={}\n",
+         ticks_per_quarter_note_, ticks_per_frame_);
      }
   }
 }

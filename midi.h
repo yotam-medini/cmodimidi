@@ -25,6 +25,7 @@ class Midi {
   Midi(const Midi&) = delete;
   void GetData(const std::string &path);
   void Parse();
+  void ParseHeader();
   size_t GetNextSize();
   size_t GetVariableLengthQuantity();
   std::string GetString(size_t length);
@@ -35,6 +36,11 @@ class Midi {
 
   uint16_t format_{0};
   uint16_t ntrks_{0};
+  uint16_t division_{0};
+
+  uint32_t ticks_per_quarter_note_{0};
+  uint8_t negative_smpte_format_{0};
+  uint16_t ticks_per_frame_{0};
 
   const uint32_t debug_;
 };
