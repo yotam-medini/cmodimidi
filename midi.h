@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,17 @@ class ParseState {
   size_t offset_{0};
   uint8_t last_status_{0};
   uint8_t last_channel{0};
+};
+
+class Event {
+ public:
+  Event() {}
+  virtual ~Event() {}
+};
+
+class Track {
+ public:
+  std::vector<std::unique_ptr<Event>> events_;
 };
 
 class Midi {
@@ -26,6 +38,9 @@ class Midi {
   void GetData(const std::string &path);
   void Parse();
   void ParseHeader();
+  void ReadOneTrack() { ReadTrack(); }
+  void ReadTracks();
+  void ReadTrack();
   size_t GetNextSize();
   size_t GetVariableLengthQuantity();
   std::string GetString(size_t length);
@@ -41,6 +56,8 @@ class Midi {
   uint32_t ticks_per_quarter_note_{0};
   uint8_t negative_smpte_format_{0};
   uint16_t ticks_per_frame_{0};
+
+  std::vector<Track> tracks_;
 
   const uint32_t debug_;
 };

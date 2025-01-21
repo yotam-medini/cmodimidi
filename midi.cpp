@@ -42,6 +42,18 @@ void Midi::GetData(const std::string &midifile_path) {
 
 void Midi::Parse() {
   ParseHeader();
+  if (Valid()) {
+    switch (format_) {
+     case 0:
+       ReadOneTrack();
+       break;
+     case 1:
+       ReadTracks();
+       break;
+     default:
+       error_ = fmt::format("Unsupported format={}", format_);
+    }
+  }
 }
 
 void Midi::ParseHeader() {
@@ -79,6 +91,23 @@ void Midi::ParseHeader() {
          ticks_per_quarter_note_, ticks_per_frame_);
      }
   }
+}
+
+void Midi::ReadTracks() {
+  for (uint16_t itrack = 0; Valid() && (itrack < ntrks_); ++itrack) {
+    ReadTrack();
+  }
+}
+
+void Midi::ReadTrack() {
+  static const std::string MTrk{"MTrk"};
+  const std::string chunk_type = GetChunkType();
+  if (chunk_type != MTrk) {
+    error_ = fmt::format("chunk_type={} != {} @ offset={}",
+      chunk_type, MTrk, parse_state_.offset_ - 4);
+  }
+  const size_t length = GetNextSize();
+  const size_t offset_eot = parse_state_.offset_ + length;
 }
 
 size_t Midi::GetNextSize() {
