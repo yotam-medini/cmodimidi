@@ -147,21 +147,51 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent() {
   uint8_t meta_first_byte = data_[parse_state_.offset_++];
   switch (meta_first_byte) {
    case 0x00:
-     length = data_[parse_state_.offset_++];
-     if (length != 2) {
-       std::cerr << fmt::format("Unexpected length={}!=2 in SequenceNumber",
-         length);
-     }
-     {
-       uint16_t number = GetU16from(parse_state_.offset_);
-       e = std::make_unique<SequenceNumberEvent>(number);
-     }
-     parse_state_.offset_ += length;
+    length = data_[parse_state_.offset_++];
+    if (length != 2) {
+      std::cerr << fmt::format("Unexpected length={}!=2 in SequenceNumber",
+        length);
+    }
+    {
+      uint16_t number = GetU16from(parse_state_.offset_);
+      e = std::make_unique<SequenceNumberEvent>(number);
+    }
+    parse_state_.offset_ += length;
    break;
+   case 0x01:
+   case 0x02:
    case 0x03:
-     length = GetVariableLengthQuantity();
-     text = GetString(length);
-     e = std::make_unique<TextEvent>(text);
+   case 0x04:
+   case 0x05:
+   case 0x06:
+   case 0x09:
+    length = GetVariableLengthQuantity();
+    text = GetString(length);
+    switch (meta_first_byte) {
+     case 0x01:
+      e = std::make_unique<TextEvent>(text);
+      break;
+     case 0x02:
+      e = std::make_unique<CopyrightEvent>(text);
+      break;
+     case 0x03:
+      e = std::make_unique<SequenceTrackNameEvent>(text);
+      break;
+     case 0x04:
+      e = std::make_unique<InstrumentNameEvent>(text);
+      break;
+     case 0x05:
+      e = std::make_unique<LyricEvent>(text);
+      break;
+     case 0x06:
+      e = std::make_unique<MarkerEvent>(text);
+      break;
+     case 0x09:
+      e = std::make_unique<DeviceEvent>(text);
+      break;
+     default:
+      error_ = fmt::format("BUG meta_first_byte={:0x2}", meta_first_byte);
+    }
    break;
    default:
     error_ = fmt::format("Meta event unsupported byte={:02x}", meta_first_byte);
