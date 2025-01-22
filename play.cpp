@@ -111,8 +111,8 @@ class DynamicTiming {
     microseconds_per_quarter_ = ms_per_quarter;
   }
   uint32_t TicksToMs(uint32_t ticks) const {
-    uint64_t numer = uint64_t{ticks} * microseconds_per_quarter_;
-    uint32_t ms = RoundDiv(numer, k_ticks_per_quarter_);
+    uint64_t number = uint64_t{ticks} * microseconds_per_quarter_;
+    uint32_t ms = RoundDiv(number, k_ticks_per_quarter_);
     return ms;
   }
   uint32_t AbsTicksToMs(uint32_t abs_ticks) {
@@ -275,21 +275,35 @@ void Player::HandleMidi(
    case midi::MidiVarByte::NOTE_OFF_x0: // handled by NOTE_ON
     break;
    case midi::MidiVarByte::NOTE_ON_x1: {
-    const midi::NoteOnEvent *note_on =
-      dynamic_cast<const midi::NoteOnEvent*>(me);
+      const midi::NoteOnEvent *note_on =
+        dynamic_cast<const midi::NoteOnEvent*>(me);
       if (after_begin && note_on->velocity_ != 0) {
         uint32_t duration_ticks = GetNoteDuration(index_event_index, *note_on);
         uint32_t duration_ms = dyn_timing.TicksToMs(duration_ticks);
+        uint32_t duration_modified = FactorU32(pp_.tempo_factor_, duration_ms);
+        MaxBy(final_ms_, date_ms_modified + duration_modified);
         abs_events_.push_back(std::make_unique<NoteEvent>(
           date_ms_modified, date_ms,
           note_on->channel_, note_on->key_, note_on->velocity_,
-          FactorU32(pp_.tempo_factor_, duration_ms), duration_ms));
+          duration_modified, duration_ms));
       }
     }
     break;
-   case midi::MidiVarByte::PROGRAM_CHANGE_x4:
+   case midi::MidiVarByte::PROGRAM_CHANGE_x4: {
+      const midi::ProgramChangeEvent* pc =
+        dynamic_cast<const midi::ProgramChangeEvent*>(me);
+      MaxBy(final_ms_, date_ms_modified);
+      abs_events_.push_back(std::make_unique<ProgramChange>(
+        date_ms_modified, date_ms, pc->channel_, pc->number_));
+    }
     break;
-   case midi::MidiVarByte::PITCH_WHEEL_x6:
+   case midi::MidiVarByte::PITCH_WHEEL_x6: {
+      const midi::PitchWheelEvent* pw =
+        dynamic_cast<const midi::PitchWheelEvent*>(me);
+      MaxBy(final_ms_, date_ms_modified);
+      abs_events_.push_back(std::make_unique<PitchWheel>(
+        date_ms_modified, date_ms, pw->channel_, pw->bend_));
+    }
     break;
    default: // ignored
     break;
