@@ -94,6 +94,7 @@ class FinalEvent : public AbsEvent {
 };
 
 class DynamicTiming {
+ public:
   DynamicTiming(
     uint64_t microseconds_per_quarter=0,
     uint64_t k_ticks_per_quarter=0,
@@ -162,6 +163,7 @@ int Player::run() {
   if (pp_.debug_ & 0x1) { std::cerr << "Player::run() begin\n"; }
   SetIndexEvents();
   if (pp_.debug_ & 0x1) { std::cerr << "Player::run() end\n"; }
+  SetAbsEvents();
   return rc_;
 }
 
@@ -185,6 +187,31 @@ void Player::SetIndexEvents() {
     }
   }
   std::sort(index_events_.begin(), index_events_.end());
+}
+
+void Player::SetAbsEvents() {
+  const std::vector<midi::Track> &tracks = pm_.GetTracks();
+  DynamicTiming dyn_timing{
+    500000,
+    1000ull * uint64_t{pm_.GetTicksPerQuarterNote()},
+    0, 0};
+  uint32_t first_note_time = GetFirstNoteTime();
+  bool done = false;
+  size_t ie_size = index_events_.size();
+  auto safe_subtract = [](uint32_t l, uint32_t r) { return l < r ? 0 : l - r; };
+  for (size_t i = 0; (i < ie_size) && !done; ++i) {
+    const IndexEvent &ie = index_events_[i];
+    uint32_t time_shifted = safe_subtract(ie.time_, first_note_time);
+    uint32_t date_ms = dyn_timing.AbsTicksToMs(time_shifted);
+    done = date_ms > pp_.end_ms_;
+    if (!done) {
+      const midi::Event *e = tracks[ie.track_].events_[ie.tei_].get();
+      if (pp_.debug_ & 0x80) {
+        std::cout << fmt::format("[{:3}] time={} shifted={}, track_event={}",
+          i, ie.time_, time_shifted, e->str());
+       }
+    }
+  }
 }
 
 uint32_t Player::GetFirstNoteTime() {
