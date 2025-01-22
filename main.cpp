@@ -4,6 +4,7 @@
 #include "dump.h"
 #include "midi.h"
 #include "options.h"
+#include "play.h"
 #include "synthseq.h"
 
 int main(int argc, char **argv) {
@@ -33,8 +34,15 @@ int main(int argc, char **argv) {
         midi_dump(parsed_midi, dump_path);
       }
     }
-    if (rc == 0) {
+    if ((rc == 0) && options.play()) {
       SynthSequencer synth_sequencer(options.soundfonts_path());
+      if (synth_sequencer.ok()) {
+        PlayParams pp;
+        play(parsed_midi, synth_sequencer, pp);
+      } else {
+        std::cerr << fmt::format("Synth/Sequencer error: {}\n",
+          synth_sequencer.error());
+      }
     }
   }
   return rc;

@@ -27,6 +27,7 @@ set(SOURCE_FILES
     dump.cpp
     midi.cpp
     options.cpp
+    play.cpp
     synthseq.cpp
 )
 
