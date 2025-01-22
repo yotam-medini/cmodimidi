@@ -46,7 +46,7 @@ class ParseState {
 
 class Event {
  public:
-  Event(uint32_t delta_time) : delta_time_{delta_time_} {}
+  Event(uint32_t delta_time) : delta_time_{delta_time} {}
   virtual ~Event() {}
   virtual std::string str() const = 0;
   uint32_t delta_time_;
