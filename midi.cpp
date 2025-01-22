@@ -165,34 +165,8 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent(uint32_t delta_time) {
    case MetaVarByte::LYRICS_x05:
    case MetaVarByte::MARK_x06:
    case MetaVarByte::DEVICE_x09:
-    length = GetVariableLengthQuantity();
-    text = GetString(length);
-    switch (meta_first_byte) {
-     case MetaVarByte::TEXT_x01:
-      e = std::make_unique<TextEvent>(delta_time, text);
-      break;
-     case MetaVarByte::COPYRIGHT_x02:
-      e = std::make_unique<CopyrightEvent>(delta_time, text);
-      break;
-     case MetaVarByte::TRACKNAME_x03:
-      e = std::make_unique<SequenceTrackNameEvent>(delta_time, text);
-      break;
-     case MetaVarByte::INSTRNAME_x04:
-      e = std::make_unique<InstrumentNameEvent>(delta_time, text);
-      break;
-     case MetaVarByte::LYRICS_x05:
-      e = std::make_unique<LyricEvent>(delta_time, text);
-      break;
-     case MetaVarByte::MARK_x06:
-      e = std::make_unique<MarkerEvent>(delta_time, text);
-      break;
-     case MetaVarByte::DEVICE_x09:
-      e = std::make_unique<DeviceEvent>(delta_time, text);
-      break;
-     default:
-      error_ = fmt::format("BUG meta_first_byte={:0x2}", meta_first_byte);
-    }
-   break;
+    e = GetTextBaseEvent(delta_time, meta_first_byte);
+    break;
    default:
     error_ = fmt::format("Meta event unsupported byte={:02x}", meta_first_byte);
   }
@@ -201,6 +175,40 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent(uint32_t delta_time) {
 
 std::unique_ptr<MidiEvent> Midi::GetMidiEvent(uint32_t delta_time) {
   std::unique_ptr<MidiEvent> e;
+  return e;
+}
+
+std::unique_ptr<TextBaseEvent> Midi::GetTextBaseEvent(
+    uint32_t delta_time,
+    uint8_t meta_first_byte) {
+  std::unique_ptr<TextBaseEvent> e;
+  uint32_t length = GetVariableLengthQuantity();
+  auto text = GetString(length);
+  switch (meta_first_byte) {
+   case MetaVarByte::TEXT_x01:
+    e = std::make_unique<TextEvent>(delta_time, text);
+    break;
+   case MetaVarByte::COPYRIGHT_x02:
+    e = std::make_unique<CopyrightEvent>(delta_time, text);
+    break;
+   case MetaVarByte::TRACKNAME_x03:
+    e = std::make_unique<SequenceTrackNameEvent>(delta_time, text);
+    break;
+   case MetaVarByte::INSTRNAME_x04:
+    e = std::make_unique<InstrumentNameEvent>(delta_time, text);
+    break;
+   case MetaVarByte::LYRICS_x05:
+    e = std::make_unique<LyricEvent>(delta_time, text);
+    break;
+   case MetaVarByte::MARK_x06:
+    e = std::make_unique<MarkerEvent>(delta_time, text);
+    break;
+   case MetaVarByte::DEVICE_x09:
+    e = std::make_unique<DeviceEvent>(delta_time, text);
+    break;
+   default:
+    error_ = fmt::format("BUG meta_first_byte={:0x2}", meta_first_byte);
+  }
   return e;
 }
 

@@ -256,6 +256,9 @@ class Midi {
   std::unique_ptr<Event> GetTrackEvent();
   std::unique_ptr<MetaEvent> GetMetaEvent(uint32_t delta_time);
   std::unique_ptr<MidiEvent> GetMidiEvent(uint32_t delta_time);
+  std::unique_ptr<TextBaseEvent> GetTextBaseEvent(
+    uint32_t delta_time,
+    uint8_t meta_first_byte);
   size_t GetNextSize();
   size_t GetVariableLengthQuantity();
   uint16_t GetU16from(size_t from) const;
