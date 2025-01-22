@@ -207,6 +207,7 @@ void Player::SetAbsEvents() {
     500000,
     1000ull * uint64_t{pm_.GetTicksPerQuarterNote()},
     0, 0};
+  final_ms_ = 0;
   uint32_t first_note_time = GetFirstNoteTime();
   bool done = false;
   size_t ie_size = index_events_.size();
@@ -233,6 +234,9 @@ void Player::SetAbsEvents() {
       }
     }
   }
+  abs_events_.push_back(std::make_unique<FinalEvent>(
+    std::max(final_ms_, pp_.begin_ms_),
+    abs_events_.empty() ? 0 : abs_events_.back()->time_ms_original_));
 }
 
 uint32_t Player::GetFirstNoteTime() {
