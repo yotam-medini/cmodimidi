@@ -361,6 +361,14 @@ class Midi {
   Midi(const std::string &path, uint32_t debug=0);
   std::string GetError() const { return error_; }
   bool Valid() const { return error_.empty(); }
+  uint16_t GetFormat() const { return format_; }
+  size_t GetNumTracks() const { return ntrks_; }
+  uint16_t GetDivision() const { return division_; }
+  uint32_t GetTicksPerQuarterNote() const { return ticks_per_quarter_note_; }
+  uint8_t GetNegativeSmpteFormat() const { return negative_smpte_format_; }
+  uint16_t GetTicksPerFrame() const { return ticks_per_frame_; }
+  const std::vector<Track> &GetTracks() const { return tracks_; }
+  
  private:
   using vu8_t = std::vector<uint8_t>;
   Midi() = delete;
