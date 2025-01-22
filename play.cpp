@@ -168,6 +168,7 @@ class Player {
 
   std::vector<IndexEvent> index_events_;
   std::vector<std::unique_ptr<AbsEvent>> abs_events_;
+  uint32_t final_ms_{0};
 };
 
 int Player::run() {
@@ -279,6 +280,10 @@ void Player::HandleMidi(
       if (after_begin && note_on->velocity_ != 0) {
         uint32_t duration_ticks = GetNoteDuration(index_event_index, *note_on);
         uint32_t duration_ms = dyn_timing.TicksToMs(duration_ticks);
+        abs_events_.push_back(std::make_unique<NoteEvent>(
+          date_ms_modified, date_ms,
+          note_on->channel_, note_on->key_, note_on->velocity_,
+          FactorU32(pp_.tempo_factor_, duration_ms), duration_ms));
       }
     }
     break;
