@@ -12,7 +12,7 @@ class PlayParams {
   uint32_t initial_delay_ms_{0};
   uint32_t batch_duration_ms_{0};
   bool progress_{false};
-  uint32_t debug_flags{0};
+  uint32_t debug_{0};
 };
 
 class SynthSequencer;

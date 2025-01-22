@@ -38,6 +38,13 @@ int main(int argc, char **argv) {
       SynthSequencer synth_sequencer(options.soundfonts_path());
       if (synth_sequencer.ok()) {
         PlayParams pp;
+        pp.begin_ms_ = options.begin_millisec();
+        pp.end_ms_ = options.end_millisec();
+        pp.tempo_factor_ = options.tempo();
+        pp.initial_delay_ms_ = options.delay_millisec();
+        pp.batch_duration_ms_ = options.batch_duration_millisec();
+        pp.progress_ = options.progress();
+        pp.debug_ = debug;
         play(parsed_midi, synth_sequencer, pp);
       } else {
         std::cerr << fmt::format("Synth/Sequencer error: {}\n",

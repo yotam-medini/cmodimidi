@@ -118,7 +118,7 @@ class _OptionsImpl {
   }
   bool info() const { return vm_.count("info"); }
   std::string dump_path() const { return vm_["dump"].as<std::string>(); }
-  bool play() const { return vm_.count("noplay") == 0; }
+  bool play() const { return !(vm_["noplay"].as<bool>()); }
   bool progress() const { return vm_.count("progress"); }
   uint32_t begin_millisec() const { return GetMilli("begin"); }
   uint32_t end_millisec() const { return GetMilli("end"); }
