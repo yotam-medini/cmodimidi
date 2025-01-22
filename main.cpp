@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fmt/core.h>
 #include <fluidsynth.h>
+#include "dump.h"
 #include "midi.h"
 #include "options.h"
 #include "synthseq.h"
@@ -25,6 +26,12 @@ int main(int argc, char **argv) {
     if (!parsed_midi.Valid()) {
       std::cerr << fmt::format("Midi error: {}\n", parsed_midi.GetError());
       rc = 1;
+    }
+    if (rc == 0) {
+      auto dump_path = options.dump_path();
+      if (!dump_path.empty()) {
+        midi_dump(parsed_midi, dump_path);
+      }
     }
     if (rc == 0) {
       SynthSequencer synth_sequencer(options.soundfonts_path());

@@ -14,6 +14,7 @@ class Options {
   bool valid() const;
   bool help() const;
   bool info() const;
+  std::string dump_path() const;
   bool play() const;
   bool progress() const;
   uint32_t begin_millisec() const;

@@ -117,6 +117,7 @@ class _OptionsImpl {
     return v;
   }
   bool info() const { return vm_.count("info"); }
+  std::string dump_path() const { return vm_["dump"].as<std::string>(); }
   bool play() const { return vm_.count("noplay") == 0; }
   bool progress() const { return vm_.count("progress"); }
   uint32_t begin_millisec() const { return GetMilli("begin"); }
@@ -172,6 +173,8 @@ void _OptionsImpl::AddOptions() {
        "Path to sound fonts file")
     ("info", po::bool_switch()->default_value(false),
        "print general information of the midi file")
+    ("dump", po::value<std::string>()->default_value(""),
+       "Dump midi contents to file, '-' for stdout")
     ("noplay", po::bool_switch()->default_value(false), "Suppress playing")
     ("progress", po::bool_switch()->default_value(false), "show progress")
     ("debug", po::value<std::string>()->default_value("0"), "Debug flags")
@@ -202,6 +205,10 @@ bool Options::help() const {
 
 bool Options::info() const {
   return p_->info();
+}
+
+std::string Options::dump_path() const {
+  return p_->dump_path();
 }
 
 bool Options::play() const {

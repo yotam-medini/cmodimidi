@@ -24,6 +24,7 @@ include_directories(
 # Set the source files
 set(SOURCE_FILES
     main.cpp
+    dump.cpp
     midi.cpp
     options.cpp
     synthseq.cpp
