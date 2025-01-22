@@ -29,6 +29,7 @@ class Player {
 
  private:
   void SetIndexEvents();
+  uint32_t GetFirstNoteTime();
   void SetAbsEvents();
   int rc_{0};
 
@@ -38,6 +39,13 @@ class Player {
 
   std::vector<IndexEvent> index_events_;
 };
+
+int Player::run() {
+  if (pp_.debug_ & 0x1) { std::cerr << "Player::run() begin\n"; }
+  SetIndexEvents();
+  if (pp_.debug_ & 0x1) { std::cerr << "Player::run() end\n"; }
+  return rc_;
+}
 
 void Player::SetIndexEvents() {
   const std::vector<midi::Track> &tracks = pm_.GetTracks();
@@ -61,11 +69,20 @@ void Player::SetIndexEvents() {
   std::sort(index_events_.begin(), index_events_.end());
 }
 
-int Player::run() {
-  if (pp_.debug_ & 0x1) { std::cerr << "Player::run() begin\n"; }
-  SetIndexEvents();
-  if (pp_.debug_ & 0x1) { std::cerr << "Player::run() end\n"; }
-  return rc_;
+uint32_t Player::GetFirstNoteTime() {
+  uint32_t t = 0;
+  bool note_seen = false;
+  const std::vector<midi::Track> &tracks = pm_.GetTracks();
+  for (size_t i = 0; (i < index_events_.size()) && !note_seen; ++i) {
+    const IndexEvent &ie = index_events_[i];
+    midi::Event *e = tracks[ie.track_].events_[ie.tei_].get();
+    midi::NoteOnEvent *note_on = dynamic_cast<midi::NoteOnEvent*>(e);
+    if (note_on) {
+      note_seen = true;
+      t = ie.time_;
+    }
+  }
+  return t;
 }
 
 int play(
