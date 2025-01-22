@@ -48,7 +48,7 @@ class Event {
  public:
   Event(uint32_t delta_time) : delta_time_{delta_time_} {}
   virtual ~Event() {}
-  virtual std::string str() const { return ""; }
+  virtual std::string str() const = 0;
   uint32_t delta_time_;
 };
 
@@ -57,7 +57,6 @@ class MetaEvent : public Event {
   MetaEvent(uint32_t dt) : Event{dt} {}
   virtual ~MetaEvent() {}
   virtual MetaVarByte VarByte() const = 0;
-  virtual std::string str() const { return ""; }
 };
 
 class MidiEvent : public Event {
@@ -65,7 +64,6 @@ class MidiEvent : public Event {
   MidiEvent(uint32_t dt) : Event{dt} {}
   virtual ~MidiEvent() {}
   virtual MidiVarByte VarByte() const = 0;
-  virtual std::string str() const { return ""; }
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -77,6 +75,7 @@ class SequenceNumberEvent : public MetaEvent { // 0xff 0x01
     MetaEvent{dt},
     number_{number_} {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::SEQNUM_x00; }
+  std::string str() const;
   uint16_t number_;
 };
 
@@ -153,6 +152,7 @@ class ChannelPrefixEvent : public MetaEvent { // 0xff 0x20
     MetaEvent{dt}, channel_{channel} {}
   virtual ~ChannelPrefixEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::CHANPFX_x20; }
+  std::string str() const;
   uint8_t channel_;
 };
 
@@ -161,6 +161,7 @@ class PortEvent : public MetaEvent { // 0xff 0x21
   PortEvent(uint32_t dt, uint8_t port) : MetaEvent{dt}, port_{port} {}
   virtual ~PortEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::PORT_x21; }
+  std::string str() const;
   uint8_t port_;
 };
 
@@ -169,6 +170,7 @@ class EndOfTrackEvent : public MetaEvent { // 0xff 0x2f
   EndOfTrackEvent(uint32_t dt) : MetaEvent{dt}  {}
   virtual ~EndOfTrackEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::ENDTRACK_x2f; }
+  std::string str() const;
 };
 
 class TempoEvent : public MetaEvent { // 0xff 0x51
@@ -176,6 +178,7 @@ class TempoEvent : public MetaEvent { // 0xff 0x51
   TempoEvent(uint32_t dt, uint32_t tttttt) : MetaEvent{dt}, tttttt_{tttttt}  {}
   virtual ~TempoEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::TEMPO_x51; }
+  std::string str() const;
   uint32_t tttttt_;
 };
 
@@ -191,6 +194,7 @@ class SmpteOffsetEvent : public MetaEvent { // 0xff 0x54
      MetaEvent{dt}, hr_{hr}, mn_{mn}, se_{se}, fr_{fr}, ff_{ff} {}
   virtual ~SmpteOffsetEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::SMPTE_x54; }
+  std::string str() const;
   uint8_t hr_;
   uint8_t mn_;
   uint8_t se_;
@@ -209,6 +213,7 @@ class TimeSignatureEvent : public MetaEvent { // 0xff 0x58
     MetaEvent{dt}, nn_{nn}, dd_{dd}, cc_{cc}, bb_{bb} {}
   virtual ~TimeSignatureEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::TIMESIGN_x58; }
+  std::string str() const;
   uint8_t nn_;
   uint8_t dd_;
   uint8_t cc_;
@@ -221,6 +226,7 @@ class KeySignatureEvent : public MetaEvent { // 0xff 0x59
     MetaEvent{dt}, sf_{sf}, mi_{mi} {}
   virtual ~KeySignatureEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::KEYSIGN_x59; }
+  std::string str() const;
   uint16_t sf_;
   bool mi_;
 };
@@ -231,6 +237,7 @@ class SequencerEvent : public MetaEvent { // 0xff 0x7f
     MetaEvent{dt}, data_{data} {}
   virtual ~SequencerEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::SEQUEMCER_x7f; }
+  std::string str() const;
   std::vector<uint8_t> data_;
 };
 

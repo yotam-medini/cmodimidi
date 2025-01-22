@@ -8,8 +8,49 @@ namespace fs = std::filesystem;
 
 namespace midi {
 
+// Meta Event
+
+std::string SequenceNumberEvent::str() const {
+  return fmt::format("DT={} SequenceNumbe({})", delta_time_, number_);
+}
+
 std::string TextBaseEvent::str() const {
-  return fmt::format("{}({})", event_type_name(), s_);
+  return fmt::format("DT={} {}({})", delta_time_, event_type_name(), s_);
+}
+
+std::string ChannelPrefixEvent::str() const {
+  return fmt::format("DT={} ChannelPrefix({})", delta_time_, channel_);
+}
+
+std::string PortEvent::str() const {
+  return fmt::format("DT={} PortEvent({})", delta_time_, port_);
+}
+
+std::string EndOfTrackEvent::str() const {
+  return fmt::format("DT={} EndOfTrack", delta_time_);
+}
+
+std::string TempoEvent::str() const {
+  return fmt::format("DT={} Port({})", delta_time_, tttttt_);
+}
+
+std::string SmpteOffsetEvent::str() const {
+  return fmt::format("DT={} SmpteOffset(hr={}, mn={}, se={}, fr={}, ff={})",
+    delta_time_, hr_, mn_, se_, fr_, ff_);
+}
+
+std::string TimeSignatureEvent::str() const {
+  return fmt::format("DT={} TimeSignature(nn={}, dd={}, cc={}, bb={})",
+    delta_time_, nn_, dd_, cc_, bb_);
+}
+
+std::string KeySignatureEvent::str() const {
+  return fmt::format("DT={} KeySignatureEvent(sf={}, mi={})",
+    delta_time_, sf_, mi_);
+}
+
+std::string SequencerEvent::str() const {
+  return fmt::format("DT={} Sequencer(#(data)={})", delta_time_, data_.size());
 }
 
 // Midi Event
