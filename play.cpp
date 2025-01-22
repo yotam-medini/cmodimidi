@@ -150,8 +150,16 @@ class Player {
   void SetIndexEvents();
   uint32_t GetFirstNoteTime();
   void SetAbsEvents();
-  void HandleMeta(const midi::MetaEvent*, DynamicTiming&);
-  void HandleMidi(const midi::MidiEvent*, DynamicTiming&);
+  void HandleMeta(const midi::MetaEvent*, DynamicTiming&, uint32_t ts);
+  void HandleMidi(
+    const midi::MidiEvent*,
+    DynamicTiming& dyn_timing,
+    size_t index_event_index,
+    uint32_t date_ms);
+  uint32_t GetNoteDuration(size_t iei, const midi::NoteOnEvent &note_on) const;
+  static uint32_t FactorU32(double f, uint32_t u);
+  static void MaxBy(uint32_t &v, uint32_t x) { if (v < x) { v = x; } }
+
   int rc_{0};
 
   const midi::Midi &pm_; // parsed_midi
@@ -218,9 +226,9 @@ void Player::SetAbsEvents() {
       const midi::MidiEvent *midi_event =
         dynamic_cast<const midi::MidiEvent*>(e);
       if (meta_event) {
-        HandleMeta(meta_event, dyn_timing);
+        HandleMeta(meta_event, dyn_timing, time_shifted);
       } else if (midi_event) {
-        HandleMidi(midi_event, dyn_timing);
+        HandleMidi(midi_event, dyn_timing, i, date_ms);
       }
     }
   }
@@ -242,10 +250,85 @@ uint32_t Player::GetFirstNoteTime() {
   return t;
 }
 
-void Player::HandleMeta(const midi::MetaEvent*, DynamicTiming&) {
+void Player::HandleMeta(
+    const midi::MetaEvent* me,
+    DynamicTiming& dyn_timing,
+    uint32_t time_shifted) {
+  const midi::TempoEvent *tempo = dynamic_cast<const midi::TempoEvent*>(me);
+  if (tempo) {
+    dyn_timing.SetMicrosecondsPerQuarter(time_shifted, tempo->tttttt_);
+  }
 }
 
-void Player::HandleMidi(const midi::MidiEvent*, DynamicTiming&) {
+void Player::HandleMidi(
+    const midi::MidiEvent* me,
+    DynamicTiming &dyn_timing,
+    size_t index_event_index,
+    uint32_t date_ms) {
+  const bool after_begin = pp_.begin_ms_ <= date_ms;
+  uint32_t date_ms_modified = after_begin
+    ? FactorU32(pp_.tempo_factor_, date_ms - pp_.begin_ms_)
+    : pp_.begin_ms_;
+  const midi::MidiVarByte vb = me->VarByte();
+  switch (vb) {
+   case midi::MidiVarByte::NOTE_OFF_x0: // handled by NOTE_ON
+    break;
+   case midi::MidiVarByte::NOTE_ON_x1: {
+    const midi::NoteOnEvent *note_on =
+      dynamic_cast<const midi::NoteOnEvent*>(me);
+      if (after_begin && note_on->velocity_ != 0) {
+        uint32_t duration_ticks = GetNoteDuration(index_event_index, *note_on);
+        uint32_t duration_ms = dyn_timing.TicksToMs(duration_ticks);
+      }
+    }
+    break;
+   case midi::MidiVarByte::PROGRAM_CHANGE_x4:
+    break;
+   case midi::MidiVarByte::PITCH_WHEEL_x6:
+    break;
+   default: // ignored
+    break;
+  }
+}
+
+uint32_t Player::GetNoteDuration(
+    size_t iei,
+    const midi::NoteOnEvent& note_on) const {
+  uint32_t curr_time = 0;
+  const std::vector<midi::Track> &tracks = pm_.GetTracks();
+  bool end_note_found = false;
+  for (size_t i = iei + 1; (i < index_events_.size()) && !end_note_found; ++i) {
+    const IndexEvent &ie = index_events_[i];
+    curr_time = ie.time_;
+    const midi::Event *e = tracks[ie.track_].events_[ie.tei_].get();
+    const midi::NoteOffEvent *note_off =
+      dynamic_cast<const midi::NoteOffEvent*>(e);
+    const midi::NoteOnEvent *note_on1 =
+      dynamic_cast<const midi::NoteOnEvent*>(e);
+    if (note_off) {
+      end_note_found = (note_off->channel_ == note_on.channel_) &&
+        (note_off->key_ == note_on.key_);
+    } else if (note_on1) {
+      end_note_found = (note_on1->velocity_ == 0) &&
+        (note_on1->channel_ == note_on.channel_) &&
+        (note_on1->key_ == note_on.key_);
+    }
+  }
+  uint32_t dur = curr_time - index_events_[iei].time_;
+  return dur;
+}
+
+uint32_t Player::FactorU32(double f, uint32_t u) {
+  static const double dmaxu32 = std::numeric_limits<uint32_t>::max();
+  uint32_t ret = 0;
+  double fu = (f * u) + (1./2.);
+  if (fu > dmaxu32) {
+    std::cerr << fmt::format("Overflow factor_u32(f={}, u={})", f, u);
+    ret = u;
+  } else {
+    ret = static_cast<uint32_t>(fu);
+  }
+  return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////
