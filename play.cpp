@@ -150,6 +150,8 @@ class Player {
   void SetIndexEvents();
   uint32_t GetFirstNoteTime();
   void SetAbsEvents();
+  void HandleMeta(const midi::MetaEvent*, DynamicTiming&);
+  void HandleMidi(const midi::MidiEvent*, DynamicTiming&);
   int rc_{0};
 
   const midi::Midi &pm_; // parsed_midi
@@ -157,6 +159,7 @@ class Player {
   const PlayParams &pp_;
 
   std::vector<IndexEvent> index_events_;
+  std::vector<std::unique_ptr<AbsEvent>> abs_events_;
 };
 
 int Player::run() {
@@ -207,9 +210,18 @@ void Player::SetAbsEvents() {
     if (!done) {
       const midi::Event *e = tracks[ie.track_].events_[ie.tei_].get();
       if (pp_.debug_ & 0x80) {
-        std::cout << fmt::format("[{:3}] time={} shifted={}, track_event={}",
+        std::cout << fmt::format("[{:4}] time={} shifted={}, track_event={}\n",
           i, ie.time_, time_shifted, e->str());
-       }
+      }
+      const midi::MetaEvent *meta_event =
+        dynamic_cast<const midi::MetaEvent*>(e);
+      const midi::MidiEvent *midi_event =
+        dynamic_cast<const midi::MidiEvent*>(e);
+      if (meta_event) {
+        HandleMeta(meta_event, dyn_timing);
+      } else if (midi_event) {
+        HandleMidi(midi_event, dyn_timing);
+      }
     }
   }
 }
@@ -229,6 +241,14 @@ uint32_t Player::GetFirstNoteTime() {
   }
   return t;
 }
+
+void Player::HandleMeta(const midi::MetaEvent*, DynamicTiming&) {
+}
+
+void Player::HandleMidi(const midi::MidiEvent*, DynamicTiming&) {
+}
+
+////////////////////////////////////////////////////////////////////////
 
 int play(
     const midi::Midi &parsed_midi,
