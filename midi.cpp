@@ -12,6 +12,38 @@ std::string TextBaseEvent::str() const {
   return fmt::format("{}({})", event_type_name(), s_);
 }
 
+// Midi Event
+std::string NoteOffEvent::str() const { 
+  return fmt::format("DT={} NoteOff(channel={}, key={}, velocity={})",
+    delta_time_, channel_, key_, velocity_);
+}
+std::string NoteOnEvent::str() const {
+  return fmt::format("DT={} NoteOn(channel={}, key={}, velocity={})",
+    delta_time_, channel_, key_, velocity_);
+}
+std::string KeyPressureEvent::str() const {
+  return fmt::format("DT={} KeyPressure(channel={}, number={}, value={})",
+    delta_time_, channel_, number_, value_);
+}
+std::string ControlChangeEvent::str() const {
+  return fmt::format("DT={} ControlChange(channel={}, number={}, value={})",
+    delta_time_, channel_, number_, value_);
+}
+std::string ProgramChangeEvent::str() const {
+  return fmt::format("DT={} ProgramChange(channel={}, number={})",
+    delta_time_, channel_, number_);
+}
+std::string ChannelPressureEvent::str() const {
+  return fmt::format("DT={} ChannelPressure(channel={}, value={})",
+    delta_time_, channel_, value_);
+}
+std::string PitchWheelEvent::str() const {
+  return fmt::format("DT={} ChannelPressure(channel={}, bend={})",
+    delta_time_, channel_, bend_);
+}
+
+////////////////////////////////////////////////////////////////////////
+
 Midi::Midi(const std::string &midifile_path, uint32_t debug) :
   debug_{debug} {
   GetData(midifile_path);
@@ -141,7 +173,7 @@ std::unique_ptr<Event> Midi::GetTrackEvent() {
      std::cerr << "Sysex Event ignored\n";
     break;
    default:
-    e = GetMidiEvent(delta_time);
+    e = GetMidiEvent(delta_time, event_first_byte);
   }
   return e;
 }
@@ -273,8 +305,58 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent(uint32_t delta_time) {
   return e;
 }
 
-std::unique_ptr<MidiEvent> Midi::GetMidiEvent(uint32_t delta_time) {
+std::unique_ptr<MidiEvent> Midi::GetMidiEvent(
+    uint32_t delta_time,
+    uint8_t event_first_byte) {
   std::unique_ptr<MidiEvent> e;
+  uint8_t upper4 = (event_first_byte >> 4) & 0xff;
+  if (upper4 & 0x8 != 0) {
+    parse_state_.last_status_ = upper4 & 0x7;
+    parse_state_.last_channel_ = event_first_byte & 0xf;
+  } else {
+    --parse_state_.offset_; 
+  }
+  const size_t offs = parse_state_.offset_;
+  switch (parse_state_.last_status_) {
+   case MidiVarByte::NOTE_OFF_x0:
+    e = std::make_unique<NoteOffEvent>(
+      delta_time, parse_state_.last_channel_, data_[offs], data_[offs + 1]);
+    parse_state_.offset_ += 2;
+    break;
+   case MidiVarByte::NOTE_ON_x1:
+    e = std::make_unique<NoteOnEvent>(
+      delta_time, parse_state_.last_channel_, data_[offs], data_[offs + 1]);
+    parse_state_.offset_ += 2;
+    break;
+   case MidiVarByte::KEY_PRESSURE_x2:
+    e = std::make_unique<KeyPressureEvent>(
+      delta_time, parse_state_.last_channel_, data_[offs], data_[offs + 1]);
+    parse_state_.offset_ += 2;
+    break;
+   case MidiVarByte::CONTROL_CHANGE_x3:
+    e = std::make_unique<ControlChangeEvent>(
+      delta_time, parse_state_.last_channel_, data_[offs], data_[offs + 1]);
+    parse_state_.offset_ += 2;
+    break;
+   case MidiVarByte::PROGRAM_CHANGE_x4:
+    e = std::make_unique<ProgramChangeEvent>(
+      delta_time, parse_state_.last_channel_, data_[offs]);
+    parse_state_.offset_ += 1;
+    break;
+   case MidiVarByte::CHANNEL_PRESSURE_x5:
+    e = std::make_unique<ChannelPressureEvent>(
+      delta_time, parse_state_.last_channel_, data_[offs]);
+    parse_state_.offset_ += 1;
+    break;
+   case MidiVarByte::PITCH_WHEEL_x6: {
+      uint16_t lllllll = data_[offs] & 0x7f;
+      uint16_t mmmmmmm = data_[offs + 1] & 0x7f;
+      uint16_t bend = (mmmmmmm << 7) | lllllll;
+      e = std::make_unique<PitchWheelEvent>(
+        delta_time, parse_state_.last_channel_, bend);
+    }
+    break;
+  }
   return e;
 }
 

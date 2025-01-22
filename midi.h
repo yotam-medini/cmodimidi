@@ -25,14 +25,23 @@ enum MetaVarByte : uint8_t {
   TIMESIGN_x58  = 0x58,
   KEYSIGN_x59   = 0x59,
   SEQUEMCER_x7f = 0x7f,
+};
 
+enum MidiVarByte : uint8_t {
+  NOTE_OFF_x0         = 0x0,
+  NOTE_ON_x1          = 0x1,
+  KEY_PRESSURE_x2     = 0x2,
+  CONTROL_CHANGE_x3   = 0x3,
+  PROGRAM_CHANGE_x4   = 0x4,
+  CHANNEL_PRESSURE_x5 = 0x5,
+  PITCH_WHEEL_x6      = 0x6,
 };
 
 class ParseState {
  public:
   size_t offset_{0};
   uint8_t last_status_{0};
-  uint8_t last_channel{0};
+  uint8_t last_channel_{0};
 };
 
 class Event {
@@ -46,20 +55,21 @@ class Event {
 class MetaEvent : public Event {
  public:
   MetaEvent(uint32_t dt) : Event{dt} {}
-  virtual ~MetaEvent() {} 
+  virtual ~MetaEvent() {}
   virtual MetaVarByte VarByte() const = 0;
   virtual std::string str() const { return ""; }
 };
 
 class MidiEvent : public Event {
  public:
-  MidiEvent(uint32_t dt)  : Event{dt} {}
+  MidiEvent(uint32_t dt) : Event{dt} {}
   virtual ~MidiEvent() {}
+  virtual MidiVarByte VarByte() const = 0;
   virtual std::string str() const { return ""; }
 };
 
 ////////////////////////////////////////////////////////////////////////
-// Meta Events 
+// Meta Events
 
 class SequenceNumberEvent : public MetaEvent { // 0xff 0x01
  public:
@@ -172,7 +182,7 @@ class TempoEvent : public MetaEvent { // 0xff 0x51
 class SmpteOffsetEvent : public MetaEvent { // 0xff 0x54
  public:
   SmpteOffsetEvent(
-    uint32_t dt, 
+    uint32_t dt,
     uint8_t hr,
     uint8_t mn,
     uint8_t se,
@@ -195,7 +205,7 @@ class TimeSignatureEvent : public MetaEvent { // 0xff 0x58
     uint8_t nn,
     uint8_t dd,
     uint8_t cc,
-    uint8_t bb) : 
+    uint8_t bb) :
     MetaEvent{dt}, nn_{nn}, dd_{dd}, cc_{cc}, bb_{bb} {}
   virtual ~TimeSignatureEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::TIMESIGN_x58; }
@@ -207,7 +217,7 @@ class TimeSignatureEvent : public MetaEvent { // 0xff 0x58
 
 class KeySignatureEvent : public MetaEvent { // 0xff 0x59
  public:
-  KeySignatureEvent(uint32_t dt, uint16_t sf, bool mi) : 
+  KeySignatureEvent(uint32_t dt, uint16_t sf, bool mi) :
     MetaEvent{dt}, sf_{sf}, mi_{mi} {}
   virtual ~KeySignatureEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::KEYSIGN_x59; }
@@ -217,22 +227,129 @@ class KeySignatureEvent : public MetaEvent { // 0xff 0x59
 
 class SequencerEvent : public MetaEvent { // 0xff 0x7f
  public:
-  SequencerEvent(uint32_t dt, const std::vector<uint8_t> &data) : 
+  SequencerEvent(uint32_t dt, const std::vector<uint8_t> &data) :
     MetaEvent{dt}, data_{data} {}
   virtual ~SequencerEvent() {}
   virtual MetaVarByte VarByte() const { return MetaVarByte::SEQUEMCER_x7f; }
   std::vector<uint8_t> data_;
 };
 
-// End of Meta Events 
+// End of Meta Events
 ////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////
-// Midi Events 
+// Midi Events
 
-// End of Midi Events 
+class NoteOffEvent : public MidiEvent {
+ public:
+  NoteOffEvent(
+    unsigned dt,
+    uint8_t channel,
+    uint8_t key,
+    uint8_t velocity) :
+      MidiEvent(dt), channel_{channel}, key_{key}, velocity_{velocity} {}
+  virtual ~NoteOffEvent() {}
+  virtual MidiVarByte VarByte() const { return MidiVarByte::NOTE_OFF_x0; }
+  virtual std::string str() const;
+  uint8_t channel_{0};
+  uint8_t key_{0};
+  uint8_t velocity_{0}; // Should be zero
+};
+
+class NoteOnEvent : public MidiEvent {
+ public:
+  NoteOnEvent(
+    unsigned dt,
+    uint8_t channel,
+    uint8_t key,
+    uint8_t velocity) :
+      MidiEvent(dt), channel_{channel}, key_{key}, velocity_{velocity} {}
+  virtual ~NoteOnEvent() {}
+  virtual MidiVarByte VarByte() const { return MidiVarByte::NOTE_ON_x1; }
+  virtual std::string str() const;
+  uint8_t channel_{0};
+  uint8_t key_{0};
+  uint8_t velocity_{0};
+};
+
+class KeyPressureEvent : public MidiEvent {
+ public:
+  KeyPressureEvent(
+    unsigned dt,
+    uint8_t channel,
+    uint8_t number,
+    uint8_t value) :
+      MidiEvent(dt), channel_{channel}, number_{number}, value_{value} {}
+  virtual ~KeyPressureEvent() {}
+  virtual MidiVarByte VarByte() const { return MidiVarByte::KEY_PRESSURE_x2; }
+  virtual std::string str() const;
+  uint8_t channel_{0};
+  uint8_t number_{0};
+  uint8_t value_{0};
+};
+
+class ControlChangeEvent : public MidiEvent {
+ public:
+  ControlChangeEvent(
+    unsigned dt,
+    uint8_t channel,
+    uint8_t number,
+    uint8_t value) :
+      MidiEvent(dt), channel_{channel}, number_{number}, value_{value} {}
+  virtual ~ControlChangeEvent() {}
+  virtual MidiVarByte VarByte() const { return MidiVarByte::CONTROL_CHANGE_x3; }
+  virtual std::string str() const;
+  uint8_t channel_{0};
+  uint8_t number_{0};
+  uint8_t value_{0};
+};
+
+class ProgramChangeEvent : public MidiEvent {
+ public:
+  ProgramChangeEvent(
+    unsigned dt,
+    uint8_t channel,
+    uint8_t number) :
+      MidiEvent(dt), channel_{channel}, number_{number} {}
+  virtual ~ProgramChangeEvent() {}
+  virtual MidiVarByte VarByte() const { return MidiVarByte::PROGRAM_CHANGE_x4; }
+  virtual std::string str() const;
+  uint8_t channel_{0};
+  uint8_t number_{0};
+};
+
+class ChannelPressureEvent : public MidiEvent {
+ public:
+  ChannelPressureEvent(
+    unsigned dt,
+    uint8_t channel,
+    uint8_t value) :
+      MidiEvent(dt), channel_{channel}, value_{value} {}
+  virtual ~ChannelPressureEvent() {}
+  virtual MidiVarByte VarByte() const {
+    return MidiVarByte::CHANNEL_PRESSURE_x5;
+  }
+  virtual std::string str() const;
+  uint8_t channel_{0};
+  uint8_t value_{0};
+};
+
+class PitchWheelEvent : public MidiEvent {
+ public:
+  PitchWheelEvent(
+    unsigned dt,
+    uint8_t channel,
+    uint16_t bend) :
+      MidiEvent(dt), channel_{channel}, bend_{bend} {}
+  virtual ~PitchWheelEvent() {}
+  virtual MidiVarByte VarByte() const { return MidiVarByte::PITCH_WHEEL_x6; }
+  virtual std::string str() const;
+  uint8_t channel_{0};
+  uint16_t bend_{0};
+};
+
+// End of Midi Events
 ////////////////////////////////////////////////////////////////////////
-
 
 class Track {
  public:
@@ -256,7 +373,9 @@ class Midi {
   void ReadTrack();
   std::unique_ptr<Event> GetTrackEvent();
   std::unique_ptr<MetaEvent> GetMetaEvent(uint32_t delta_time);
-  std::unique_ptr<MidiEvent> GetMidiEvent(uint32_t delta_time);
+  std::unique_ptr<MidiEvent> GetMidiEvent(
+    uint32_t delta_time,
+    uint8_t event_first_byte);
   std::unique_ptr<TextBaseEvent> GetTextBaseEvent(
     uint32_t delta_time,
     uint8_t meta_first_byte);
