@@ -118,7 +118,13 @@ void Midi::ReadTrack() {
   bool got_eot = false;
   while ((!got_eot) && (parse_state_.offset_ < offset_eot)) {
     auto event = GetTrackEvent();
+    got_eot = (dynamic_cast<EndOfTrackEvent*>(event.get()) != nullptr);
     events.push_back(std::move(event));
+  }
+  if ((!got_eot) || (parse_state_.offset_ != offset_eot)) {
+    std::cerr << fmt::format(
+      "Track not cleanly ended got_eot={}, offset={} != offset_eot={}\n",
+      got_eot, parse_state_.offset_, offset_eot);
   }
 }
 
