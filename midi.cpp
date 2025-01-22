@@ -167,8 +167,102 @@ std::unique_ptr<MetaEvent> Midi::GetMetaEvent(uint32_t delta_time) {
    case MetaVarByte::DEVICE_x09:
     e = GetTextBaseEvent(delta_time, meta_first_byte);
     break;
+   case MetaVarByte::CHANPFX_x20:
+    length = GetVariableLengthQuantity();
+    if (length != 1) {
+      std::cerr << fmt::format("Unexpected length={}!=1 in ChannelPrefix",
+        length);
+    }
+    e = std::make_unique<ChannelPrefixEvent>(
+      delta_time, data_[parse_state_.offset_]);
+    parse_state_.offset_ += length;
+    break;
+   case MetaVarByte::PORT_x21:
+    length = GetVariableLengthQuantity();
+    if (length != 1) {
+      std::cerr << fmt::format("Unexpected length={}!=1 in ChannelPrefix",
+        length);
+    }
+    e = std::make_unique<PortEvent>(delta_time, data_[parse_state_.offset_]);
+    parse_state_.offset_ += length;
+    break;
+   case MetaVarByte::ENDTRACK_x2f:
+    length = data_[parse_state_.offset_++];
+    if (length != 0) {
+      std::cerr << fmt::format("Unexpected length={}!=0 in EndOfTrack",
+        length);
+    }
+    e = std::make_unique<EndOfTrackEvent>(delta_time);
+    parse_state_.offset_ += length;
+    break;
+   case MetaVarByte::TEMPO_x51: {
+      auto tttttt = GetSizedQuantity();
+      e = std::make_unique<TempoEvent>(delta_time, tttttt);
+    }
+    break;
+   case MetaVarByte::SMPTE_x54:
+    length = data_[parse_state_.offset_++];
+    if (length != 5) {
+      std::cerr << fmt::format("Unexpected length={}!=5 in Tempo",
+        length);
+    }
+    {
+      size_t offs = parse_state_.offset_;
+      e = std::make_unique<SmpteOffsetEvent>(
+        delta_time, 
+        data_[offs + 0],
+        data_[offs + 1],
+        data_[offs + 2],
+        data_[offs + 3],
+        data_[offs + 4]);
+    }
+    parse_state_.offset_ += length;
+    break;
+   case MetaVarByte::TIMESIGN_x58:
+    length = data_[parse_state_.offset_++];
+    if (length != 4) {
+      std::cerr << fmt::format("Unexpected length={}!=4 in TimeSignature",
+        length);
+    }
+    {
+      size_t offs = parse_state_.offset_;
+      e = std::make_unique<TimeSignatureEvent>(
+        delta_time, 
+        data_[offs + 0],
+        data_[offs + 1],
+        data_[offs + 2],
+        data_[offs + 3]);
+    }
+    parse_state_.offset_ += length;
+    break;
+   case MetaVarByte::KEYSIGN_x59:
+    length = data_[parse_state_.offset_++];
+    if (length != 2) {
+      std::cerr << fmt::format("Unexpected length={}!=2 in KeySignature",
+        length);
+    }
+    {
+      size_t offs = parse_state_.offset_;
+      e = std::make_unique<KeySignatureEvent>(
+        delta_time, data_[offs + 0], data_[offs + 1] != 0);
+    }
+    parse_state_.offset_ += length;
+    break;
+   case MetaVarByte::SEQUEMCER_x7f:
+    length = GetVariableLengthQuantity();
+    {
+      std::vector<uint8_t>::const_iterator 
+        b = data_.begin() + parse_state_.offset_;
+      std::vector<uint8_t> data{b, b + length};
+      e = std::make_unique<SequencerEvent>(delta_time, data);
+    }
+    parse_state_.offset_ += length;
+    break;
    default:
-    error_ = fmt::format("Meta event unsupported byte={:02x}", meta_first_byte);
+    error_ = fmt::format("Meta event unsupported byte={:02x} @ {}",
+      meta_first_byte, parse_state_.offset_ - 1);
+    length = GetVariableLengthQuantity();
+    parse_state_.offset_ += length;
   }
   return e;
 }
@@ -221,6 +315,16 @@ size_t Midi::GetNextSize() {
   }
   parse_state_.offset_ += 4;
   return sz;
+}
+
+size_t Midi::GetSizedQuantity() {
+  const size_t n_bytes = data_[parse_state_.offset_++];
+  size_t quantity = 0;
+  for (size_t i = 0; i < n_bytes; ++i) {
+    size_t b{data_[parse_state_.offset_++]};
+    quantity = (quantity << 8) | b;
+  }
+  return quantity;
 }
 
 size_t Midi::GetVariableLengthQuantity() {

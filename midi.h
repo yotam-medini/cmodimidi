@@ -25,6 +25,7 @@ enum MetaVarByte : uint8_t {
   TIMESIGN_x58  = 0x58,
   KEYSIGN_x59   = 0x59,
   SEQUEMCER_x7f = 0x7f,
+
 };
 
 class ParseState {
@@ -260,6 +261,7 @@ class Midi {
     uint32_t delta_time,
     uint8_t meta_first_byte);
   size_t GetNextSize();
+  size_t GetSizedQuantity();
   size_t GetVariableLengthQuantity();
   uint16_t GetU16from(size_t from) const;
   std::string GetString(size_t length);
