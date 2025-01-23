@@ -5,6 +5,7 @@
 #include <tuple>
 #include <vector>
 #include <fmt/core.h>
+#include <fluidsynth.h>
 #include "synthseq.h"
 
 class IndexEvent {
@@ -140,6 +141,33 @@ class DynamicTiming {
 
 ////////////////////////////////////////////////////////////////////////
 
+#if 0
+class OldCallBackData {
+ public:
+  OldCallBackData(
+    SynthSequencer &ss,
+    const std::vector<std::unique_ptr<AbsEvent>> &abs_events,
+    const PlayParams &pp) :
+      ss_{ss}, abs_events_{abs_events}, pp_{pp} {}
+    
+ private:
+  SynthSequencer &ss_;
+  const std::vector<std::unique_ptr<AbsEvent>> &abs_events_;
+  const PlayParams &pp_;
+};
+#endif
+
+class Player; // forward
+class CallBackData {
+ public:
+  enum CallBack { Periodic, Final, Progress };
+  CallBackData(CallBack ecb, Player *player) : ecb_{ecb}, player_{player} {}
+  CallBack ecb_;
+  class Player *player_;
+};
+
+////////////////////////////////////////////////////////////////////////
+
 class Player {
  public:
   Player(const midi::Midi &pm, SynthSequencer &ss, const PlayParams &pp) :
@@ -150,6 +178,7 @@ class Player {
   void SetIndexEvents();
   uint32_t GetFirstNoteTime();
   void SetAbsEvents();
+  void play();
   void HandleMeta(const midi::MetaEvent*, DynamicTiming&, uint32_t ts);
   void HandleMidi(
     const midi::MidiEvent*,
@@ -159,6 +188,24 @@ class Player {
   uint32_t GetNoteDuration(size_t iei, const midi::NoteOnEvent &note_on) const;
   static uint32_t FactorU32(double f, uint32_t u);
   static void MaxBy(uint32_t &v, uint32_t x) { if (v < x) { v = x; } }
+
+  static void callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq,
+    void *data);
+  void periodic_callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq);
+  void final_callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq);
+  void progress_callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq);
 
   int rc_{0};
 
@@ -176,6 +223,7 @@ int Player::run() {
   SetIndexEvents();
   if (pp_.debug_ & 0x1) { std::cerr << "Player::run() end\n"; }
   SetAbsEvents();
+  play();
   return rc_;
 }
 
@@ -237,6 +285,14 @@ void Player::SetAbsEvents() {
   abs_events_.push_back(std::make_unique<FinalEvent>(
     std::max(final_ms_, pp_.begin_ms_),
     abs_events_.empty() ? 0 : abs_events_.back()->time_ms_original_));
+}
+
+void Player::play() {
+  // CallBackData cbd{ss_, abs_events_, pp_};
+  // std::cout << "sizeof(cbd)=" << sizeof(cbd) << '\n';
+  CallBackData cbd_periodic{CallBackData::CallBack::Periodic, this};
+  int periodic_seq_id = fluid_sequencer_register_client(
+    ss_.sequencer_, "periodic", callback, &cbd_periodic);
 }
 
 uint32_t Player::GetFirstNoteTime() {
@@ -339,6 +395,48 @@ uint32_t Player::GetNoteDuration(
   }
   uint32_t dur = curr_time - index_events_[iei].time_;
   return dur;
+}
+
+void Player::callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq,
+    void *data) {
+  CallBackData *cbd = static_cast<CallBackData*>(data);
+  switch (cbd->ecb_) {
+   case CallBackData::CallBack::Periodic:
+    cbd->player_->periodic_callback(time, event, seq);
+    break;
+   case CallBackData::CallBack::Final:
+    cbd->player_->final_callback(time, event, seq);
+    break;
+   case CallBackData::CallBack::Progress:
+    cbd->player_->progress_callback(time, event, seq);
+    break;
+   default:
+    std::cerr << "BUG: callback ecb=" << static_cast<int>(cbd->ecb_) << '\n';
+  }  
+}
+
+void Player::periodic_callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq) {
+  std::cout << "periodic_callback not yet\n";
+}
+
+void Player::final_callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq) {
+  std::cout << "final_callback not yet\n";
+}
+
+void Player::progress_callback(
+    unsigned int time,
+    fluid_event_t *event,
+    fluid_sequencer_t *seq) {
+  std::cout << "progress_callback_callback not yet\n";
 }
 
 uint32_t Player::FactorU32(double f, uint32_t u) {
