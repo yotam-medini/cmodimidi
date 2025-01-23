@@ -33,7 +33,7 @@ class AbsEvent {
   AbsEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     time_ms_{time_ms}, time_ms_original_{time_ms_original} {}
   virtual ~AbsEvent() {}
-  virtual void SendEvent(fluid_event_t *fluid_event, const Player *player) = 0;
+  virtual void Handle(const Player *player, uint32_t date_ms) = 0;
   virtual std::string str() const = 0;
   uint32_t time_ms_;
   uint32_t time_ms_original_;
@@ -56,7 +56,7 @@ class NoteEvent : public AbsEvent {
       duration_ms_{duration_ms},
       duration_ms_original_{duration_ms_original} {}
   virtual ~NoteEvent() {}
-  void SendEvent(fluid_event_t *fluid_event, const Player *player);
+  void Handle(const Player *player, uint32_t date_ms);
   std::string str() const {
     return fmt::format(
       "Note(t={}, channel={}, key={}, velocity={}, duration={})",
@@ -81,7 +81,7 @@ class ProgramChange : public AbsEvent {
       program_{program} {
   }
   virtual ~ProgramChange() {}
-  void SendEvent(fluid_event_t *fluid_event, const Player *player);
+  void Handle(const Player *player, uint32_t date_ms);
   std::string str() const {
     return fmt::format("ProgramChange(t={}, channel={}, program={})",
       time_ms_, channel_, program_);
@@ -102,7 +102,7 @@ class PitchWheel : public AbsEvent {
       bend_{bend} {
   }
   virtual ~PitchWheel() {}
-  void SendEvent(fluid_event_t *fluid_event, const Player *player);
+  void Handle(const Player *player, uint32_t date_ms);
   std::string str() const {
     return fmt::format("PitchWheel(t={}, channel={}, bend={})",
       time_ms_, channel_, bend_);
@@ -116,7 +116,7 @@ class FinalEvent : public AbsEvent {
   FinalEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     AbsEvent{time_ms, time_ms_original} {}
   virtual ~FinalEvent() {}
-  void SendEvent(fluid_event_t *fluid_event, const Player *player);
+  void Handle(const Player *player, uint32_t date_ms);
   std::string str() const { return fmt::format("Final(t={})", time_ms_); }
 };
 
@@ -172,18 +172,21 @@ class CallBackData {
   enum CallBack { Periodic, Final, Progress };
   CallBackData(CallBack ecb, Player *player) : ecb_{ecb}, player_{player} {}
   CallBack ecb_;
-  class Player *player_;
+  Player *player_;
 };
 
 ////////////////////////////////////////////////////////////////////////
 
 class Player {
  public:
-  enum SeqId : size_t { SeqIdPeriodic, SeqIdFinal, SeqIdProgress, SeqId_N };
+  enum SeqId : size_t { 
+    SeqIdSynth, SeqIdPeriodic, SeqIdFinal, SeqIdProgress, SeqId_N };
   Player(const midi::Midi &pm, SynthSequencer &ss, const PlayParams &pp) :
     pm_{pm}, ss_{ss}, pp_{pp} {
     std::fill(seq_ids_.begin(), seq_ids_.end(), -1);
+    seq_ids_[SeqIdSynth] = ss.synth_seq_id_;
   }
+  const SynthSequencer &GetSynthSequencer() const { return ss_; }
   int GetSeqId(SeqId esi) const { return seq_ids_[esi]; }
   int run();
 
@@ -219,6 +222,7 @@ class Player {
     unsigned int time,
     fluid_event_t *event,
     fluid_sequencer_t *seq);
+  void SendPeriodicAt(uint32_t at);
 
   int rc_{0};
 
@@ -330,15 +334,7 @@ void Player::play() {
     seq_ids_[SeqIdProgress] = fluid_sequencer_register_client(
       ss_.sequencer_, "progress", callback, &cbd_progress);
   }
-  fluid_event_t *first_event = new_fluid_event();
-  fluid_event_set_source(first_event, -1);
-  fluid_event_set_dest(first_event, seq_ids_[SeqIdPeriodic]);
-  fluid_event_timer(first_event, nullptr);
-  int send_rc = fluid_sequencer_send_at(ss_.sequencer_, first_event, 0, 1);
-  if (send_rc != FLUID_OK) {
-    std::cerr << fmt::format("fluid_sequencer_send_at rc={}\n", send_rc);
-  }
-  delete_fluid_event(first_event);
+  SendPeriodicAt(0);
   if (pp_.debug_ & 0x2) { std::cout << "wait on lock\n"; }
   cv.wait(lock, [this]{ return final_handled_; });
   if (pp_.debug_ & 0x2) { std::cout << "unlocked\n"; }
@@ -446,6 +442,18 @@ uint32_t Player::GetNoteDuration(
   return dur;
 }
 
+void Player::SendPeriodicAt(uint32_t at) {
+  fluid_event_t *e = new_fluid_event();
+  fluid_event_set_source(e, -1);
+  fluid_event_set_dest(e, seq_ids_[SeqIdPeriodic]);
+  fluid_event_timer(e, nullptr);
+  int send_rc = fluid_sequencer_send_at(ss_.sequencer_, e, at, 1);
+  if (send_rc != FLUID_OK) {
+    std::cerr << fmt::format("fluid_sequencer_send_at rc={}\n", send_rc);
+  }
+  delete_fluid_event(e);
+}
+
 void Player::callback(
     unsigned int time,
     fluid_event_t *event,
@@ -476,6 +484,8 @@ void Player::periodic_callback(
   const size_t nae = abs_events_.size();
   bool batch_done = false;
   uint32_t now = fluid_sequencer_get_tick(ss_.sequencer_);
+  uint32_t time_limit = (next_send_index < nae)
+    ? abs_events_[next_send_index]->time_ms_ + pp_.batch_duration_ms_ : 0;
   for (; (next_send_index < nae) && !batch_done; ++next_send_index) {
     if (next_send_index == 0) {
       date_add_ms_ = now + pp_.initial_delay_ms_;
@@ -483,8 +493,13 @@ void Player::periodic_callback(
         std::cerr << fmt::format("date_add_ms_={}\n", date_add_ms_);
       }
     }
-    fluid_event_t *fluid_event = new_fluid_event();
-    abs_events_[next_send_index]->SendEvent(fluid_event, this);
+    AbsEvent *e = abs_events_[next_send_index].get();
+    uint32_t date_ms = e->time_ms_ + date_add_ms_;
+    e->Handle(this, date_ms);
+    batch_done = (e->time_ms_ >= time_limit);
+  }
+  if (next_send_index < nae) {
+    SendPeriodicAt(now + pp_.batch_duration_ms_ / 2);
   }
 }
 
@@ -516,17 +531,24 @@ uint32_t Player::FactorU32(double f, uint32_t u) {
   return ret;
 }
 
-// Now that Player is defined, we can define SendEvent virtual methods
-void NoteEvent::SendEvent(fluid_event_t *fluid_event, const Player *player) {
+// Now that Player is defined, we can define Handle virtual methods
+void NoteEvent::Handle(const Player *player, uint32_t date_ms) {
+  fluid_event_t *event = new_fluid_event();
+  fluid_event_set_source(event, -1);
+  fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdSynth));
+  fluid_event_note(event, channel_, key_, velocity_, duration_ms_);
+  fluid_sequencer_send_at(
+    player->GetSynthSequencer().sequencer_, event, date_ms, 1);
+  delete_fluid_event(event);
 }
 
-void ProgramChange::SendEvent(fluid_event_t *fluid_event, const Player *player) {
+void ProgramChange::Handle(const Player *player, uint32_t date_ms) {
 }
 
-void PitchWheel::SendEvent(fluid_event_t *fluid_event, const Player *player) {
+void PitchWheel::Handle(const Player *player, uint32_t date_ms) {
 }
 
-void FinalEvent::SendEvent(fluid_event_t *fluid_event, const Player *player) {
+void FinalEvent::Handle(const Player *player, uint32_t date_ms) {
 }
 
 ////////////////////////////////////////////////////////////////////////
