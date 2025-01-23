@@ -33,7 +33,8 @@ class AbsEvent {
   AbsEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     time_ms_{time_ms}, time_ms_original_{time_ms_original} {}
   virtual ~AbsEvent() {}
-  virtual void Handle(const Player *player, uint32_t date_ms) = 0;
+  virtual void SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms) = 0;
   virtual std::string str() const = 0;
   uint32_t time_ms_;
   uint32_t time_ms_original_;
@@ -56,7 +57,8 @@ class NoteEvent : public AbsEvent {
       duration_ms_{duration_ms},
       duration_ms_original_{duration_ms_original} {}
   virtual ~NoteEvent() {}
-  void Handle(const Player *player, uint32_t date_ms);
+  void SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms);
   std::string str() const {
     return fmt::format(
       "Note(t={}, channel={}, key={}, velocity={}, duration={})",
@@ -81,7 +83,8 @@ class ProgramChange : public AbsEvent {
       program_{program} {
   }
   virtual ~ProgramChange() {}
-  void Handle(const Player *player, uint32_t date_ms);
+  void SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms);
   std::string str() const {
     return fmt::format("ProgramChange(t={}, channel={}, program={})",
       time_ms_, channel_, program_);
@@ -102,7 +105,8 @@ class PitchWheel : public AbsEvent {
       bend_{bend} {
   }
   virtual ~PitchWheel() {}
-  void Handle(const Player *player, uint32_t date_ms);
+  void SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms);
   std::string str() const {
     return fmt::format("PitchWheel(t={}, channel={}, bend={})",
       time_ms_, channel_, bend_);
@@ -116,7 +120,8 @@ class FinalEvent : public AbsEvent {
   FinalEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     AbsEvent{time_ms, time_ms_original} {}
   virtual ~FinalEvent() {}
-  void Handle(const Player *player, uint32_t date_ms);
+  void SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms);
   std::string str() const { return fmt::format("Final(t={})", time_ms_); }
 };
 
@@ -495,7 +500,9 @@ void Player::periodic_callback(
     }
     AbsEvent *e = abs_events_[next_send_index].get();
     uint32_t date_ms = e->time_ms_ + date_add_ms_;
-    e->Handle(this, date_ms);
+    fluid_event_t *event = new_fluid_event();
+    e->SetSendFluidEvent(event, this, date_ms);
+    delete_fluid_event(event);
     batch_done = (e->time_ms_ >= time_limit);
   }
   if (next_send_index < nae) {
@@ -540,43 +547,39 @@ uint32_t Player::FactorU32(double f, uint32_t u) {
 }
 
 // Now that Player is defined, we can define Handle virtual methods
-void NoteEvent::Handle(const Player *player, uint32_t date_ms) {
-  fluid_event_t *event = new_fluid_event();
+void NoteEvent::SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms) {
   fluid_event_set_source(event, -1);
   fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdSynth));
   fluid_event_note(event, channel_, key_, velocity_, duration_ms_);
   fluid_sequencer_send_at(
     player->GetSynthSequencer().sequencer_, event, date_ms, 1);
-  delete_fluid_event(event);
 }
 
-void ProgramChange::Handle(const Player *player, uint32_t date_ms) {
-  fluid_event_t *event = new_fluid_event();
+void ProgramChange::SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms) {
   fluid_event_set_source(event, -1);
   fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdSynth));
   fluid_event_program_change(event, channel_, program_);
   fluid_sequencer_send_at(
     player->GetSynthSequencer().sequencer_, event, date_ms, 1);
-  delete_fluid_event(event);
 }
 
-void PitchWheel::Handle(const Player *player, uint32_t date_ms) {
-  fluid_event_t *event = new_fluid_event();
+void PitchWheel::SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms) {
   fluid_event_set_source(event, -1);
   fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdSynth));
   fluid_event_pitch_bend(event, channel_, bend_);
   fluid_sequencer_send_at(
     player->GetSynthSequencer().sequencer_, event, date_ms, 1);
-  delete_fluid_event(event);
 }
 
-void FinalEvent::Handle(const Player *player, uint32_t date_ms) {
-  fluid_event_t *event = new_fluid_event();
+void FinalEvent::SetSendFluidEvent(
+    fluid_event_t *event, const Player *player, uint32_t date_ms) {
   fluid_event_set_source(event, -1);
   fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdFinal));
   fluid_sequencer_send_at(
     player->GetSynthSequencer().sequencer_, event, date_ms, 1);
-  delete_fluid_event(event);
 }
 
 ////////////////////////////////////////////////////////////////////////
