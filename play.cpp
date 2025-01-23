@@ -1,6 +1,9 @@
 #include "play.h"
 #include <algorithm>
+#include <condition_variable>
 #include <iostream>
+#include <iostream>
+#include <mutex>
 #include <numeric>
 #include <tuple>
 #include <vector>
@@ -141,22 +144,6 @@ class DynamicTiming {
 
 ////////////////////////////////////////////////////////////////////////
 
-#if 0
-class OldCallBackData {
- public:
-  OldCallBackData(
-    SynthSequencer &ss,
-    const std::vector<std::unique_ptr<AbsEvent>> &abs_events,
-    const PlayParams &pp) :
-      ss_{ss}, abs_events_{abs_events}, pp_{pp} {}
-    
- private:
-  SynthSequencer &ss_;
-  const std::vector<std::unique_ptr<AbsEvent>> &abs_events_;
-  const PlayParams &pp_;
-};
-#endif
-
 class Player; // forward
 class CallBackData {
  public:
@@ -216,6 +203,10 @@ class Player {
   std::vector<IndexEvent> index_events_;
   std::vector<std::unique_ptr<AbsEvent>> abs_events_;
   uint32_t final_ms_{0};
+
+  bool final_handled_{false};
+  std::mutex mtx_;
+  std::condition_variable cv;
 };
 
 int Player::run() {
@@ -288,11 +279,23 @@ void Player::SetAbsEvents() {
 }
 
 void Player::play() {
-  // CallBackData cbd{ss_, abs_events_, pp_};
-  // std::cout << "sizeof(cbd)=" << sizeof(cbd) << '\n';
+  std::unique_lock lock(mtx_);
+  if (pp_.debug_ & 0x2) { std::cout << "play: mutex locked\n"; }
   CallBackData cbd_periodic{CallBackData::CallBack::Periodic, this};
   int periodic_seq_id = fluid_sequencer_register_client(
     ss_.sequencer_, "periodic", callback, &cbd_periodic);
+  CallBackData cbd_final{CallBackData::CallBack::Final, this};
+  int final_seq_id = fluid_sequencer_register_client(
+    ss_.sequencer_, "final", callback, &cbd_final);
+  int progress_seq_id{-1};
+  CallBackData cbd_progress{CallBackData::CallBack::Final, this};
+  if (pp_.progress_) {
+    progress_seq_id = fluid_sequencer_register_client(
+      ss_.sequencer_, "progress", callback, &cbd_progress);
+  }
+  if (pp_.debug_ & 0x2) { std::cout << "wait on lock\n"; }
+  cv.wait(lock, [this]{ return final_handled_; });
+  if (pp_.debug_ & 0x2) { std::cout << "unlocked\n"; }
 }
 
 uint32_t Player::GetFirstNoteTime() {
@@ -429,7 +432,8 @@ void Player::final_callback(
     unsigned int time,
     fluid_event_t *event,
     fluid_sequencer_t *seq) {
-  std::cout << "final_callback not yet\n";
+  if (pp_.debug_ & 0x2) { std::cout << "final_callback\n"; } 
+  final_handled_ = true;
 }
 
 void Player::progress_callback(
