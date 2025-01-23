@@ -25,11 +25,14 @@ bool operator<(const IndexEvent& ie0, const IndexEvent& ie1) {
     std::tie(ie1.time_, ie1.track_, ie1.tei_);
 }
 
+class Player; // forward
+
 class AbsEvent {
  public:
   AbsEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     time_ms_{time_ms}, time_ms_original_{time_ms_original} {}
   virtual ~AbsEvent() {}
+  virtual void SendEvent(fluid_event_t *fluid_event, const Player *player) = 0;
   virtual std::string str() const = 0;
   uint32_t time_ms_;
   uint32_t time_ms_original_;
@@ -52,6 +55,7 @@ class NoteEvent : public AbsEvent {
       duration_ms_{duration_ms},
       duration_ms_original_{duration_ms_original} {}
   virtual ~NoteEvent() {}
+  void SendEvent(fluid_event_t *fluid_event, const Player *player);
   std::string str() const {
     return fmt::format(
       "Note(t={}, channel={}, key={}, velocity={}, duration={})",
@@ -76,6 +80,7 @@ class ProgramChange : public AbsEvent {
       program_{program} {
   }
   virtual ~ProgramChange() {}
+  void SendEvent(fluid_event_t *fluid_event, const Player *player);
   std::string str() const {
     return fmt::format("ProgramChange(t={}, channel={}, program={})",
       time_ms_, channel_, program_);
@@ -96,6 +101,7 @@ class PitchWheel : public AbsEvent {
       bend_{bend} {
   }
   virtual ~PitchWheel() {}
+  void SendEvent(fluid_event_t *fluid_event, const Player *player);
   std::string str() const {
     return fmt::format("PitchWheel(t={}, channel={}, bend={})",
       time_ms_, channel_, bend_);
@@ -109,6 +115,7 @@ class FinalEvent : public AbsEvent {
   FinalEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     AbsEvent{time_ms, time_ms_original} {}
   virtual ~FinalEvent() {}
+  void SendEvent(fluid_event_t *fluid_event, const Player *player);
   std::string str() const { return fmt::format("Final(t={})", time_ms_); }
 };
 
@@ -159,7 +166,6 @@ class DynamicTiming {
 
 ////////////////////////////////////////////////////////////////////////
 
-class Player; // forward
 class CallBackData {
  public:
   enum CallBack { Periodic, Final, Progress };
@@ -172,8 +178,12 @@ class CallBackData {
 
 class Player {
  public:
+  enum SeqId : size_t { SeqIdPeriodic, SeqIdFinal, SeqIdProgress, SeqId_N };
   Player(const midi::Midi &pm, SynthSequencer &ss, const PlayParams &pp) :
-    pm_{pm}, ss_{ss}, pp_{pp} {}
+    pm_{pm}, ss_{ss}, pp_{pp} {
+    std::fill(seq_ids_.begin(), seq_ids_.end(), -1);
+  }
+  int GetSeqId(SeqId esi) const { return seq_ids_[esi]; }
   int run();
 
  private:
@@ -219,8 +229,12 @@ class Player {
   std::vector<std::unique_ptr<AbsEvent>> abs_events_;
   uint32_t final_ms_{0};
 
+  std::array<int, SeqId_N>  seq_ids_;
+  size_t next_send_index{0};
+  uint32_t date_add_ms_{0};
   bool final_handled_{false};
-  std::mutex mtx_;
+  std::mutex sending_mtx_;
+  std::mutex play_mtx_;
   std::condition_variable cv;
 };
 
@@ -302,20 +316,28 @@ void Player::SetAbsEvents() {
 }
 
 void Player::play() {
-  std::unique_lock lock(mtx_);
+  std::unique_lock lock(play_mtx_);
   if (pp_.debug_ & 0x2) { std::cout << "play: mutex locked\n"; }
   CallBackData cbd_periodic{CallBackData::CallBack::Periodic, this};
-  int periodic_seq_id = fluid_sequencer_register_client(
+  seq_ids_[SeqIdPeriodic] = fluid_sequencer_register_client(
     ss_.sequencer_, "periodic", callback, &cbd_periodic);
   CallBackData cbd_final{CallBackData::CallBack::Final, this};
-  int final_seq_id = fluid_sequencer_register_client(
+  seq_ids_[SeqIdFinal] = fluid_sequencer_register_client(
     ss_.sequencer_, "final", callback, &cbd_final);
-  int progress_seq_id{-1};
   CallBackData cbd_progress{CallBackData::CallBack::Final, this};
   if (pp_.progress_) {
-    progress_seq_id = fluid_sequencer_register_client(
+    seq_ids_[SeqIdProgress] = fluid_sequencer_register_client(
       ss_.sequencer_, "progress", callback, &cbd_progress);
   }
+  fluid_event_t *first_event = new_fluid_event();
+  fluid_event_set_source(first_event, -1);
+  fluid_event_set_dest(first_event, seq_ids_[SeqIdPeriodic]);
+  fluid_event_timer(first_event, nullptr);
+  int send_rc = fluid_sequencer_send_at(ss_.sequencer_, first_event, 0, 1);
+  if (send_rc != FLUID_OK) {
+    std::cerr << fmt::format("fluid_sequencer_send_at rc={}\n", send_rc);
+  }
+  delete_fluid_event(first_event);
   if (pp_.debug_ & 0x2) { std::cout << "wait on lock\n"; }
   cv.wait(lock, [this]{ return final_handled_; });
   if (pp_.debug_ & 0x2) { std::cout << "unlocked\n"; }
@@ -448,7 +470,35 @@ void Player::periodic_callback(
     unsigned int time,
     fluid_event_t *event,
     fluid_sequencer_t *seq) {
-  std::cout << "periodic_callback not yet\n";
+  std::cout << "periodic_callback ...\n";
+  const std::lock_guard<std::mutex> lock(sending_mtx_);
+  const size_t nae = abs_events_.size();
+  bool batch_done = false;
+  uint32_t now = fluid_sequencer_get_tick(ss_.sequencer_);
+  for (; (next_send_index < nae) && !batch_done; ++next_send_index) {
+    if (next_send_index == 0) {
+      date_add_ms_ = now + pp_.initial_delay_ms_;
+      if (pp_.debug_ & 0x1) {
+        std::cerr << fmt::format("date_add_ms_={}\n", date_add_ms_);
+      }
+    }
+    const AbsEvent *e = abs_events_[next_send_index].get();
+    const NoteEvent *note_event = dynamic_cast<const NoteEvent*>(e);
+    const ProgramChange *prog_change = dynamic_cast<const ProgramChange*>(e);
+    const PitchWheel *pitch_wheel = dynamic_cast<const PitchWheel*>(e);
+    const FinalEvent *final_event = dynamic_cast<const FinalEvent*>(e);
+    if (note_event) {
+      ;
+    } else if (prog_change) {
+      ;
+    } else if (pitch_wheel) {
+      ;
+    } else if (final_event) {
+      ;
+    } else {
+      std::cerr << fmt::format("periodic_callback dynamic_cast(s) failed\n");
+    }
+  }
 }
 
 void Player::final_callback(
@@ -477,6 +527,19 @@ uint32_t Player::FactorU32(double f, uint32_t u) {
     ret = static_cast<uint32_t>(fu);
   }
   return ret;
+}
+
+// Now that Player is defined, we can define SendEvent virtual methods
+void NoteEvent::SendEvent(fluid_event_t *fluid_event, const Player *player) {
+}
+
+void ProgramChange::SendEvent(fluid_event_t *fluid_event, const Player *player) {
+}
+
+void PitchWheel::SendEvent(fluid_event_t *fluid_event, const Player *player) {
+}
+
+void FinalEvent::SendEvent(fluid_event_t *fluid_event, const Player *player) {
 }
 
 ////////////////////////////////////////////////////////////////////////
