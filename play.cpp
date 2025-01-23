@@ -30,6 +30,7 @@ class AbsEvent {
   AbsEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     time_ms_{time_ms}, time_ms_original_{time_ms_original} {}
   virtual ~AbsEvent() {}
+  virtual std::string str() const = 0;
   uint32_t time_ms_;
   uint32_t time_ms_original_;
 };
@@ -51,6 +52,11 @@ class NoteEvent : public AbsEvent {
       duration_ms_{duration_ms},
       duration_ms_original_{duration_ms_original} {}
   virtual ~NoteEvent() {}
+  std::string str() const {
+    return fmt::format(
+      "Note(t={}, channel={}, key={}, velocity={}, duration={})",
+      time_ms_, channel_, key_, velocity_, duration_ms_);
+  }
   int channel_;
   int16_t key_;
   int16_t velocity_;
@@ -70,6 +76,10 @@ class ProgramChange : public AbsEvent {
       program_{program} {
   }
   virtual ~ProgramChange() {}
+  std::string str() const {
+    return fmt::format("ProgramChange(t={}, channel={}, program={})",
+      time_ms_, channel_, program_);
+  }
   int channel_;
   int program_;
 };
@@ -86,6 +96,10 @@ class PitchWheel : public AbsEvent {
       bend_{bend} {
   }
   virtual ~PitchWheel() {}
+  std::string str() const {
+    return fmt::format("PitchWheel(t={}, channel={}, bend={})",
+      time_ms_, channel_, bend_);
+  }
   int channel_;
   int bend_;
 };
@@ -95,6 +109,7 @@ class FinalEvent : public AbsEvent {
   FinalEvent(uint32_t time_ms=0, uint32_t time_ms_original=0) :
     AbsEvent{time_ms, time_ms_original} {}
   virtual ~FinalEvent() {}
+  std::string str() const { return fmt::format("Final(t={})", time_ms_); }
 };
 
 class DynamicTiming {
@@ -276,6 +291,14 @@ void Player::SetAbsEvents() {
   abs_events_.push_back(std::make_unique<FinalEvent>(
     std::max(final_ms_, pp_.begin_ms_),
     abs_events_.empty() ? 0 : abs_events_.back()->time_ms_original_));
+  if (pp_.debug_ & 0x4) {
+    const size_t nae = abs_events_.size();
+    std::cout << fmt::format("abs_events[{}]", nae) << "{\n";
+    for (size_t i = 0; i < nae; ++i) {
+      std::cout << fmt::format("  [{:4d}] {}\n", i, abs_events_[i]->str());
+    }
+    std::cout << fmt::format("abs_events[{}]", nae) << "{\n";
+  }
 }
 
 void Player::play() {
