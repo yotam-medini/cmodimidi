@@ -9,7 +9,6 @@
 
 int main(int argc, char **argv) {
   int rc = 0;
-  std::cout << fmt::format("Hello argc={}\n", argc);
   Options options(argc, argv);
   if (options.help()) {
     std::cout << options.description();

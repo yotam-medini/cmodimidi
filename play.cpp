@@ -484,7 +484,6 @@ void Player::periodic_callback(
     unsigned int time,
     fluid_event_t *event,
     fluid_sequencer_t *seq) {
-  std::cout << "periodic_callback ...\n";
   const std::lock_guard<std::mutex> lock(sending_mtx_);
   const size_t nae = abs_events_.size();
   bool batch_done = false;
@@ -517,7 +516,6 @@ void Player::final_callback(
   if (pp_.debug_ & 0x2) { std::cout << "final_callback\n"; } 
   final_handled_ = true;
   for (size_t seqii = 0; seqii < SeqId_N; ++seqii) {
-    // int periodic_seq_id = seq_ids_[SeqIdPeriodic];
     int seq_id = seq_ids_[seqii];
     fluid_sequencer_remove_events(ss_.sequencer_, -1, seq_id, -1);
     fluid_sequencer_unregister_client(ss_.sequencer_, seq_id);
