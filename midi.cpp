@@ -350,8 +350,8 @@ std::unique_ptr<MidiEvent> Midi::GetMidiEvent(
     uint32_t delta_time,
     uint8_t event_first_byte) {
   std::unique_ptr<MidiEvent> e;
-  uint8_t upper4 = (event_first_byte >> 4) & 0xff;
-  if (upper4 & 0x8 != 0) {
+  uint8_t upper4 = (event_first_byte >> 4) & 0xf;
+  if ((upper4 & 0x8) != 0) {
     parse_state_.last_status_ = upper4 & 0x7;
     parse_state_.last_channel_ = event_first_byte & 0xf;
   } else {
