@@ -240,7 +240,7 @@ class Player {
   bool final_handled_{false};
   std::mutex sending_mtx_;
   std::mutex play_mtx_;
-  std::condition_variable cv;
+  std::condition_variable cv_;
 };
 
 int Player::run() {
@@ -336,7 +336,7 @@ void Player::play() {
   }
   SendPeriodicAt(0);
   if (pp_.debug_ & 0x2) { std::cout << "wait on lock\n"; }
-  cv.wait(lock, [this]{ return final_handled_; });
+  cv_.wait(lock, [this]{ return final_handled_; });
   if (pp_.debug_ & 0x2) { std::cout << "unlocked\n"; }
 }
 
@@ -509,6 +509,14 @@ void Player::final_callback(
     fluid_sequencer_t *seq) {
   if (pp_.debug_ & 0x2) { std::cout << "final_callback\n"; } 
   final_handled_ = true;
+  for (size_t seqii = 0; seqii < SeqId_N; ++seqii) {
+    // int periodic_seq_id = seq_ids_[SeqIdPeriodic];
+    int seq_id = seq_ids_[seqii];
+    fluid_sequencer_remove_events(ss_.sequencer_, -1, seq_id, -1);
+    fluid_sequencer_unregister_client(ss_.sequencer_, seq_id);
+  }
+  if (pp_.debug_ & 0x2) { std::cout << "final_callback notify\n"; } 
+  cv_.notify_one();
 }
 
 void Player::progress_callback(
@@ -543,12 +551,32 @@ void NoteEvent::Handle(const Player *player, uint32_t date_ms) {
 }
 
 void ProgramChange::Handle(const Player *player, uint32_t date_ms) {
+  fluid_event_t *event = new_fluid_event();
+  fluid_event_set_source(event, -1);
+  fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdSynth));
+  fluid_event_program_change(event, channel_, program_);
+  fluid_sequencer_send_at(
+    player->GetSynthSequencer().sequencer_, event, date_ms, 1);
+  delete_fluid_event(event);
 }
 
 void PitchWheel::Handle(const Player *player, uint32_t date_ms) {
+  fluid_event_t *event = new_fluid_event();
+  fluid_event_set_source(event, -1);
+  fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdSynth));
+  fluid_event_pitch_bend(event, channel_, bend_);
+  fluid_sequencer_send_at(
+    player->GetSynthSequencer().sequencer_, event, date_ms, 1);
+  delete_fluid_event(event);
 }
 
 void FinalEvent::Handle(const Player *player, uint32_t date_ms) {
+  fluid_event_t *event = new_fluid_event();
+  fluid_event_set_source(event, -1);
+  fluid_event_set_dest(event, player->GetSeqId(Player::SeqIdFinal));
+  fluid_sequencer_send_at(
+    player->GetSynthSequencer().sequencer_, event, date_ms, 1);
+  delete_fluid_event(event);
 }
 
 ////////////////////////////////////////////////////////////////////////
