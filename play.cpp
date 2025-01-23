@@ -1,5 +1,6 @@
 #include "play.h"
 #include <algorithm>
+#include <array>
 #include <condition_variable>
 #include <iostream>
 #include <iostream>
@@ -482,22 +483,8 @@ void Player::periodic_callback(
         std::cerr << fmt::format("date_add_ms_={}\n", date_add_ms_);
       }
     }
-    const AbsEvent *e = abs_events_[next_send_index].get();
-    const NoteEvent *note_event = dynamic_cast<const NoteEvent*>(e);
-    const ProgramChange *prog_change = dynamic_cast<const ProgramChange*>(e);
-    const PitchWheel *pitch_wheel = dynamic_cast<const PitchWheel*>(e);
-    const FinalEvent *final_event = dynamic_cast<const FinalEvent*>(e);
-    if (note_event) {
-      ;
-    } else if (prog_change) {
-      ;
-    } else if (pitch_wheel) {
-      ;
-    } else if (final_event) {
-      ;
-    } else {
-      std::cerr << fmt::format("periodic_callback dynamic_cast(s) failed\n");
-    }
+    fluid_event_t *fluid_event = new_fluid_event();
+    abs_events_[next_send_index]->SendEvent(fluid_event, this);
   }
 }
 
