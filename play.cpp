@@ -274,16 +274,24 @@ void Player::SetIndexEvents() {
     });
   if (pp_.debug_ & 0x1) { std::cerr << fmt::format("Total events: {}\n", ne); }
   index_events_.reserve(ne);
+  if (pp_.debug_ & 0x100) { std::cout << "Raw events:\n"; }
   for (size_t ti = 0; ti < tracks.size(); ++ti) {
+    if (pp_.debug_ & 0x100) {
+      std::cout << fmt::format("Track[{}]", ti) << "{\n";
+    }
     const midi::Track &track = tracks[ti];
     const std::vector<std::unique_ptr<midi::Event>> &events = track.events_;
     const size_t nte = events.size();
     uint32_t time = 0;
     for (size_t tei = 0; tei < nte; ++tei) {
+      if (pp_.debug_ & 0x100) {
+        std::cout << fmt::format("  [{:4d}] {}\n", tei, events[tei]->str());
+      }
       uint32_t dt = events[tei]->delta_time_;
       time += dt;
       index_events_.push_back(IndexEvent(time, ti, tei));
     }
+    if (pp_.debug_ & 0x100) { std::cout << "}\n"; }
   }
   std::sort(index_events_.begin(), index_events_.end());
 }
