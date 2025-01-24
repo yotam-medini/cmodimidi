@@ -11,6 +11,7 @@
 #include <fmt/core.h>
 #include <fluidsynth.h>
 #include "synthseq.h"
+#include "util.h"
 
 class IndexEvent {
  public:
@@ -227,8 +228,11 @@ class Player {
     unsigned int time,
     fluid_event_t *event,
     fluid_sequencer_t *seq);
-  void SendPeriodicAt(uint32_t at) {
+  void SchedulePeriodicAt(uint32_t at) {
     ScheduleCallback(seq_ids_[SeqIdPeriodic], at);
+  }
+  void ScheduleProgressAt(uint32_t at) {
+    ScheduleCallback(seq_ids_[SeqIdProgress], at);
   }
   void ScheduleCallback(int seq_id, uint32_t at);
 
@@ -243,7 +247,7 @@ class Player {
   uint32_t final_ms_{0};
 
   std::array<int, SeqId_N>  seq_ids_;
-  size_t next_send_index{0};
+  size_t next_send_index_{0};
   uint32_t date_add_ms_{0};
   bool final_handled_{false};
   std::mutex sending_mtx_;
@@ -337,14 +341,18 @@ void Player::play() {
   CallBackData cbd_final{CallBackData::CallBack::Final, this};
   seq_ids_[SeqIdFinal] = fluid_sequencer_register_client(
     ss_.sequencer_, "final", callback, &cbd_final);
-  CallBackData cbd_progress{CallBackData::CallBack::Final, this};
+  CallBackData cbd_progress{CallBackData::CallBack::Progress, this};
   if (pp_.progress_) {
     seq_ids_[SeqIdProgress] = fluid_sequencer_register_client(
       ss_.sequencer_, "progress", callback, &cbd_progress);
   }
-  SendPeriodicAt(0);
+  SchedulePeriodicAt(0);
+  if (pp_.progress_) {
+    ScheduleProgressAt(100);
+  }
   if (pp_.debug_ & 0x2) { std::cout << "wait on lock\n"; }
   cv_.wait(lock, [this]{ return final_handled_; });
+  if (pp_.progress_) { std::cout << '\n'; }
   if (pp_.debug_ & 0x2) { std::cout << "unlocked\n"; }
 }
 
@@ -491,24 +499,24 @@ void Player::periodic_callback(
   const size_t nae = abs_events_.size();
   bool batch_done = false;
   uint32_t now = fluid_sequencer_get_tick(ss_.sequencer_);
-  uint32_t time_limit = (next_send_index < nae)
-    ? abs_events_[next_send_index]->time_ms_ + pp_.batch_duration_ms_ : 0;
-  for (; (next_send_index < nae) && !batch_done; ++next_send_index) {
-    if (next_send_index == 0) {
+  uint32_t time_limit = (next_send_index_ < nae)
+    ? abs_events_[next_send_index_]->time_ms_ + pp_.batch_duration_ms_ : 0;
+  for (; (next_send_index_ < nae) && !batch_done; ++next_send_index_) {
+    if (next_send_index_ == 0) {
       date_add_ms_ = now + pp_.initial_delay_ms_;
       if (pp_.debug_ & 0x1) {
         std::cerr << fmt::format("date_add_ms_={}\n", date_add_ms_);
       }
     }
-    AbsEvent *e = abs_events_[next_send_index].get();
+    AbsEvent *e = abs_events_[next_send_index_].get();
     uint32_t date_ms = e->time_ms_ + date_add_ms_;
     fluid_event_t *event = new_fluid_event();
     e->SetSendFluidEvent(event, this, date_ms);
     delete_fluid_event(event);
     batch_done = (e->time_ms_ >= time_limit);
   }
-  if (next_send_index < nae) {
-    SendPeriodicAt(now + pp_.batch_duration_ms_ / 2);
+  if (next_send_index_ < nae) {
+    SchedulePeriodicAt(now + pp_.batch_duration_ms_ / 2);
   }
 }
 
@@ -531,7 +539,24 @@ void Player::progress_callback(
     unsigned int time,
     fluid_event_t *event,
     fluid_sequencer_t *seq) {
-  std::cout << "progress_callback_callback not yet\n";
+  if ((next_send_index_ > 0) && time >= date_add_ms_) {
+    const uint32_t last_ms = abs_events_.back()->time_ms_original_;
+    uint32_t dt = time - date_add_ms_;
+    float dt_div_f = dt / pp_.tempo_div_factor_; // save div in PlayParams ?
+    uint32_t dt_div = static_cast<uint32_t>(dt_div_f);
+    uint32_t btime = dt_div + pp_.begin_ms_;
+    if ((date_add_ms_ <= btime) && (btime <= last_ms)) {
+      uint32_t tdone = btime - date_add_ms_;
+      auto mmss_done = milliseconds_to_string(tdone);
+      auto mmss_final = milliseconds_to_string(last_ms);
+      std::cout << fmt::format("\rProgress: {} / {}", mmss_done, mmss_final);
+      std::cout.flush();
+    }
+  }
+  // about event 1/10 second
+  uint32_t tmod100 = time % 100;
+  uint32_t time_next = time + (tmod100 > 50 ? 200 : 100) - tmod100;
+  ScheduleProgressAt(time_next);
 }
 
 uint32_t Player::FactorU32(double f, uint32_t u) {

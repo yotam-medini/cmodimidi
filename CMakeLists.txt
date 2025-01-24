@@ -29,6 +29,7 @@ set(SOURCE_FILES
     options.cpp
     play.cpp
     synthseq.cpp
+    util.cpp
 )
 
 # Add the executable target
