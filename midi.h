@@ -362,6 +362,7 @@ class PitchWheelEvent : public MidiEvent {
 class Track {
  public:
   std::vector<std::unique_ptr<Event>> events_;
+  std::string info(const std::string &indent="") const;
 };
 
 class Midi {
@@ -376,6 +377,7 @@ class Midi {
   uint8_t GetNegativeSmpteFormat() const { return negative_smpte_format_; }
   uint16_t GetTicksPerFrame() const { return ticks_per_frame_; }
   const std::vector<Track> &GetTracks() const { return tracks_; }
+  std::string info(const std::string& indent="") const;
   
  private:
   using vu8_t = std::vector<uint8_t>;

@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <iostream>
 #include <fstream>
+#include <set>
 #include <fmt/core.h>
 
 namespace fs = std::filesystem;
@@ -85,6 +86,51 @@ std::string PitchWheelEvent::str() const {
 }
 
 ////////////////////////////////////////////////////////////////////////
+std::string Track::info(const std::string& indent) const {
+  std::string s;
+  size_t n_notes = 0;
+  int min_key = 0x100;
+  int max_key = 0;
+  int min_vel = 0x100;
+  int max_vel = 0;
+  std::set<uint8_t> channels;
+  for (const auto &e: events_) {
+    const MetaEvent *meta_event = dynamic_cast<const MetaEvent*>(e.get());
+    const MidiEvent *midi_event = dynamic_cast<const MidiEvent*>(e.get());
+    if (meta_event) {
+      if ((!dynamic_cast<const LyricEvent*>(meta_event)) &&
+          (!dynamic_cast<const EndOfTrackEvent*>(meta_event))) {
+        s = fmt::format("{}{}{}\n", s, indent, meta_event->str());
+      }
+    } else if (midi_event) {
+      const NoteOnEvent *note_on = dynamic_cast<const NoteOnEvent*>(midi_event);
+      if (note_on) {
+        if (note_on->velocity_ > 0) {
+          ++n_notes;
+          channels.insert(channels.end(), note_on->channel_);
+          if (min_key > note_on->key_) { min_key = note_on->key_; }
+          if (max_key < note_on->key_) { max_key = note_on->key_; }
+          if (min_vel > note_on->velocity_) { min_vel = note_on->velocity_; }
+          if (max_vel < note_on->velocity_) { max_vel = note_on->velocity_; }
+        }
+      } else if (!dynamic_cast<const NoteOffEvent*>(midi_event)) {
+        s = fmt::format("{}{}{}\n", s, indent, midi_event->str());
+      }
+    }
+  }
+  if (n_notes == 0) {
+    s = fmt::format("{}{}No notes\n", s, indent);
+  } else {
+    s = fmt::format("{}{}Channels:", s, indent);
+    for (uint8_t c: channels) { s = fmt::format("{} {}", s, int(c)); }
+    s = fmt::format("{}\n{}{} notes, keys: [{}, {}], velocity: [{}, {}]\n",
+      s, indent, n_notes, min_key, max_key, min_vel, max_vel);
+  }
+  return s;
+}
+
+
+////////////////////////////////////////////////////////////////////////
 
 Midi::Midi(const std::string &midifile_path, uint32_t debug) :
   debug_{debug} {
@@ -92,6 +138,18 @@ Midi::Midi(const std::string &midifile_path, uint32_t debug) :
   if (Valid()) {
     Parse();
   }
+}
+
+std::string Midi::info(const std::string& indent) const {
+  const std::string sub_indent{indent + std::string("  ")};
+  std::string s = fmt::format("{}Format={} ntrks={}, Ticks Per (1/4)={}\n",
+    indent, format_, ntrks_, ticks_per_quarter_note_);
+  for (size_t ti = 0; ti < tracks_.size(); ++ti) {
+    s = fmt::format("{}{}Track[{}] {}", s, indent, ti, "{\n");
+    s = fmt::format("{}{}", s, tracks_[ti].info(sub_indent));
+    s = fmt::format("{}{}{}", s, indent, "}\n");
+  }
+  return s;
 }
 
 void Midi::GetData(const std::string &midifile_path) {

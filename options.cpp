@@ -116,7 +116,7 @@ class _OptionsImpl {
     }
     return v;
   }
-  bool info() const { return vm_.count("info"); }
+  bool info() const { return vm_["info"].as<bool>(); }
   std::string dump_path() const { return vm_["dump"].as<std::string>(); }
   bool play() const { return !(vm_["noplay"].as<bool>()); }
   bool progress() const { return vm_["progress"].as<bool>(); }

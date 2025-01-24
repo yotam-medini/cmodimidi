@@ -33,6 +33,11 @@ int main(int argc, char **argv) {
         midi_dump(parsed_midi, dump_path);
       }
     }
+    if (rc == 0) {
+      if (options.info()) {
+        std::cout << parsed_midi.info();
+      }
+    }
     if ((rc == 0) && options.play()) {
       SynthSequencer synth_sequencer(options.soundfonts_path());
       if (synth_sequencer.ok()) {
