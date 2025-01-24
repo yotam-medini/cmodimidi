@@ -227,7 +227,10 @@ class Player {
     unsigned int time,
     fluid_event_t *event,
     fluid_sequencer_t *seq);
-  void SendPeriodicAt(uint32_t at);
+  void SendPeriodicAt(uint32_t at) {
+    ScheduleCallback(seq_ids_[SeqIdPeriodic], at);
+  }
+  void ScheduleCallback(int seq_id, uint32_t at);
 
   int rc_{0};
 
@@ -447,10 +450,10 @@ uint32_t Player::GetNoteDuration(
   return dur;
 }
 
-void Player::SendPeriodicAt(uint32_t at) {
+void Player::ScheduleCallback(int seq_id, uint32_t at) {
   fluid_event_t *e = new_fluid_event();
   fluid_event_set_source(e, -1);
-  fluid_event_set_dest(e, seq_ids_[SeqIdPeriodic]);
+  fluid_event_set_dest(e, seq_id);
   fluid_event_timer(e, nullptr);
   int send_rc = fluid_sequencer_send_at(ss_.sequencer_, e, at, 1);
   if (send_rc != FLUID_OK) {
