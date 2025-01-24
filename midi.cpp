@@ -15,76 +15,73 @@ std::string Event::dt_str() const {
 // Meta Event
 
 std::string SequenceNumberEvent::str() const {
-  return fmt::format("SequenceNumbe({})", delta_time_, number_);
+  return fmt::format("SequenceNumber({})", number_);
 }
 
 std::string TextBaseEvent::str() const {
-  return fmt::format("{}({})", delta_time_, event_type_name(), s_);
+  return fmt::format("{}({})", event_type_name(), s_);
 }
 
 std::string ChannelPrefixEvent::str() const {
-  return fmt::format("ChannelPrefix({})", delta_time_, channel_);
+  return fmt::format("ChannelPrefix({})", channel_);
 }
 
 std::string PortEvent::str() const {
-  return fmt::format("PortEvent({})", delta_time_, port_);
+  return fmt::format("PortEvent({})", port_);
 }
 
 std::string EndOfTrackEvent::str() const {
-  return fmt::format("EndOfTrack", delta_time_);
+  return fmt::format("EndOfTrack");
 }
 
 std::string TempoEvent::str() const {
-  return fmt::format("Port({})", delta_time_, tttttt_);
+  return fmt::format("Port({})", tttttt_);
 }
 
 std::string SmpteOffsetEvent::str() const {
   return fmt::format("SmpteOffset(hr={}, mn={}, se={}, fr={}, ff={})",
-    delta_time_, hr_, mn_, se_, fr_, ff_);
+    hr_, mn_, se_, fr_, ff_);
 }
 
 std::string TimeSignatureEvent::str() const {
   return fmt::format("TimeSignature(nn={}, dd={}, cc={}, bb={})",
-    delta_time_, nn_, dd_, cc_, bb_);
+    nn_, dd_, cc_, bb_);
 }
 
 std::string KeySignatureEvent::str() const {
   return fmt::format("KeySignatureEvent(sf={}, mi={})",
-    delta_time_, sf_, mi_);
+    sf_, mi_);
 }
 
 std::string SequencerEvent::str() const {
-  return fmt::format("Sequencer(#(data)={})", delta_time_, data_.size());
+  return fmt::format("Sequencer(#(data)={})", data_.size());
 }
 
 // Midi Event
 std::string NoteOffEvent::str() const { 
   return fmt::format("NoteOff(channel={}, key={}, velocity={})",
-    delta_time_, channel_, key_, velocity_);
+    channel_, key_, velocity_);
 }
 std::string NoteOnEvent::str() const {
   return fmt::format("NoteOn(channel={}, key={}, velocity={})",
-    delta_time_, channel_, key_, velocity_);
+    channel_, key_, velocity_);
 }
 std::string KeyPressureEvent::str() const {
   return fmt::format("KeyPressure(channel={}, number={}, value={})",
-    delta_time_, channel_, number_, value_);
+    channel_, number_, value_);
 }
 std::string ControlChangeEvent::str() const {
   return fmt::format("ControlChange(channel={}, number={}, value={})",
-    delta_time_, channel_, number_, value_);
+    channel_, number_, value_);
 }
 std::string ProgramChangeEvent::str() const {
-  return fmt::format("ProgramChange(channel={}, number={})",
-    delta_time_, channel_, number_);
+  return fmt::format("ProgramChange(channel={}, number={})", channel_, number_);
 }
 std::string ChannelPressureEvent::str() const {
-  return fmt::format("ChannelPressure(channel={}, value={})",
-    delta_time_, channel_, value_);
+  return fmt::format("ChannelPressure(channel={}, value={})", channel_, value_);
 }
 std::string PitchWheelEvent::str() const {
-  return fmt::format("ChannelPressure(channel={}, bend={})",
-    delta_time_, channel_, bend_);
+  return fmt::format("ChannelPressure(channel={}, bend={})", channel_, bend_);
 }
 
 ////////////////////////////////////////////////////////////////////////

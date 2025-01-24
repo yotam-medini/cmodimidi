@@ -277,7 +277,7 @@ void Player::SetIndexEvents() {
   if (pp_.debug_ & 0x100) { std::cout << "Raw events:\n"; }
   for (size_t ti = 0; ti < tracks.size(); ++ti) {
     if (pp_.debug_ & 0x100) {
-      std::cout << fmt::format("Track[{}]", ti) << "{\n";
+      std::cout << fmt::format("Track[{}]", ti) << " {\n";
     }
     const midi::Track &track = tracks[ti];
     const std::vector<std::unique_ptr<midi::Event>> &events = track.events_;
