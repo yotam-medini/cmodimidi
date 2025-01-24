@@ -285,7 +285,7 @@ void Player::SetIndexEvents() {
     uint32_t time = 0;
     for (size_t tei = 0; tei < nte; ++tei) {
       if (pp_.debug_ & 0x100) {
-        std::cout << fmt::format("  [{:4d}] {}\n", tei, events[tei]->str());
+        std::cout << fmt::format("  [{:4d}] {}\n", tei, events[tei]->dt_str());
       }
       uint32_t dt = events[tei]->delta_time_;
       time += dt;

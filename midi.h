@@ -48,6 +48,7 @@ class Event {
  public:
   Event(uint32_t delta_time) : delta_time_{delta_time} {}
   virtual ~Event() {}
+  std::string dt_str() const;
   virtual std::string str() const = 0;
   uint32_t delta_time_;
 };
