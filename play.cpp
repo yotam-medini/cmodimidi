@@ -36,6 +36,7 @@ class AbsEvent {
   virtual ~AbsEvent() {}
   virtual void SetSendFluidEvent(
     fluid_event_t *event, const Player *player, uint32_t date_ms) = 0;
+  virtual uint32_t end_time_ms() const { return time_ms_; }
   virtual std::string str() const = 0;
   uint32_t time_ms_;
   uint32_t time_ms_original_;
@@ -60,6 +61,7 @@ class NoteEvent : public AbsEvent {
   virtual ~NoteEvent() {}
   void SetSendFluidEvent(
     fluid_event_t *event, const Player *player, uint32_t date_ms);
+  uint32_t end_time_ms() const { return time_ms_ + duration_ms_; }
   std::string str() const {
     return fmt::format(
       "Note(t={}, channel={}, key={}, velocity={}, duration={})",
@@ -320,8 +322,8 @@ void Player::SetAbsEvents() {
     }
   }
   abs_events_.push_back(std::make_unique<FinalEvent>(
-    std::max(final_ms_, pp_.begin_ms_),
-    abs_events_.empty() ? 0 : abs_events_.back()->time_ms_original_));
+    final_ms_ + 1,
+    abs_events_.empty() ? 0 : abs_events_.back()->time_ms_original_ + 1));
   if (pp_.debug_ & 0x4) {
     const size_t nae = abs_events_.size();
     std::cout << fmt::format("abs_events[{}]", nae) << "{\n";
@@ -390,7 +392,7 @@ void Player::HandleMidi(
   const bool after_begin = pp_.begin_ms_ <= date_ms;
   uint32_t date_ms_modified = after_begin
     ? FactorU32(pp_.tempo_div_factor_, date_ms - pp_.begin_ms_)
-    : pp_.begin_ms_;
+    : 0;
   const midi::MidiVarByte vb = me->VarByte();
   switch (vb) {
    case midi::MidiVarByte::NOTE_OFF_x0: // handled by NOTE_ON
