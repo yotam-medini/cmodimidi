@@ -124,7 +124,17 @@ class _OptionsImpl {
   uint32_t end_millisec() const { return GetMilli("end"); }
   uint32_t delay_millisec() const { return GetMilli("delay"); }
   uint32_t batch_duration_millisec() const { return GetMilli("batch-duration"); }
-  float tempo() const { return vm_["tempo"].as<float>(); }
+  float tempo() const {
+    static float tempo_min = 1./8.;
+    static float tempo_max = 8;
+    float v = vm_["tempo"].as<float>();
+    if (v < tempo_min) {
+      std::cerr << fmt::format("tempo increased from {} to {}\n", v, tempo_min);
+    } else if (tempo_max < v) {
+      std::cerr << fmt::format("tempo decreased from {} to {}\n", v, tempo_max);
+    }
+    return v;
+  }
   uint32_t debug() const {
     auto raw = vm_["debug"].as<std::string>();
     uint32_t flags = std::stoi(raw, nullptr, 0);

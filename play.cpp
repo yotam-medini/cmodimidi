@@ -378,7 +378,7 @@ void Player::HandleMidi(
     uint32_t date_ms) {
   const bool after_begin = pp_.begin_ms_ <= date_ms;
   uint32_t date_ms_modified = after_begin
-    ? FactorU32(pp_.tempo_factor_, date_ms - pp_.begin_ms_)
+    ? FactorU32(pp_.tempo_div_factor_, date_ms - pp_.begin_ms_)
     : pp_.begin_ms_;
   const midi::MidiVarByte vb = me->VarByte();
   switch (vb) {
@@ -390,7 +390,7 @@ void Player::HandleMidi(
       if (after_begin && note_on->velocity_ != 0) {
         uint32_t duration_ticks = GetNoteDuration(index_event_index, *note_on);
         uint32_t duration_ms = dyn_timing.TicksToMs(duration_ticks);
-        uint32_t duration_modified = FactorU32(pp_.tempo_factor_, duration_ms);
+        uint32_t duration_modified = FactorU32(pp_.tempo_div_factor_, duration_ms);
         MaxBy(final_ms_, date_ms_modified + duration_modified);
         abs_events_.push_back(std::make_unique<NoteEvent>(
           date_ms_modified, date_ms,

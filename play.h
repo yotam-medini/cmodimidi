@@ -8,7 +8,7 @@ class PlayParams {
  public:
   uint32_t begin_ms_{0};
   uint32_t end_ms_{0};
-  float tempo_factor_{1.0};
+  float tempo_div_factor_{1.0};
   uint32_t initial_delay_ms_{0};
   uint32_t batch_duration_ms_{0};
   bool progress_{false};
