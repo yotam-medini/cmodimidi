@@ -135,6 +135,19 @@ class _OptionsImpl {
     }
     return v;
   }
+  unsigned tuning() const {
+    static unsigned tuning_min = 300.;
+    static unsigned tuning_max = 480;
+    unsigned v = vm_["tuning"].as<unsigned>();
+    if (v < tuning_min) {
+      std::cerr << fmt::format("tuning increased from {} to {}\n",
+        v, tuning_min);
+    } else if (tuning_max < v) {
+      std::cerr << fmt::format("tuning decreased from {} to {}\n",
+        v, tuning_max);
+    }
+    return v;
+  }
   uint32_t debug() const {
     auto raw = vm_["debug"].as<std::string>();
     uint32_t flags = std::stoi(raw, nullptr, 0);
@@ -177,6 +190,9 @@ void _OptionsImpl::AddOptions() {
     ("tempo,T",
        po::value<float>()->default_value(1.),
        "Speed Multiplier factor")
+    ("tuning",
+       po::value<unsigned>()->default_value(440),
+       "Tuning - frequency of A4 (central La)")
     ("soundfont,s",
        po::value<std::string>()->default_value(
          "/usr/share/sounds/sf2/FluidR3_GM.sf2"),
@@ -247,6 +263,10 @@ uint32_t Options::batch_duration_millisec() const {
 
 float Options::tempo() const {
   return p_->tempo();
+}
+
+unsigned Options::tuning() const {
+  return p_->tuning();
 }
 
 uint32_t Options::debug() const {

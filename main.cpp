@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
         pp.begin_ms_ = options.begin_millisec();
         pp.end_ms_ = options.end_millisec();
         pp.tempo_div_factor_ = 1./options.tempo();
+        pp.tuning_ = options.tuning();
         pp.initial_delay_ms_ = options.delay_millisec();
         pp.batch_duration_ms_ = options.batch_duration_millisec();
         pp.progress_ = options.progress();

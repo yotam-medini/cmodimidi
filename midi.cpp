@@ -86,14 +86,55 @@ std::string PitchWheelEvent::str() const {
 }
 
 ////////////////////////////////////////////////////////////////////////
+
+std::vector<uint8_t> Track::GetChannels() const {
+  std::set<uint8_t> channels;
+  for (const auto &e: events_) {
+    const NoteOnEvent *note_on = dynamic_cast<const NoteOnEvent*>(e.get());
+    if (note_on) {
+      channels.insert(channels.end(), note_on->channel_);
+    }
+  }
+  return std::vector(channels.begin(), channels.end());
+}
+
+std::array<uint8_t, 2> Track::GetKeyRange() const {
+  std::array<uint8_t, 2> range{0xff, 0};
+  for (const auto &e: events_) {
+    const NoteOnEvent *note_on = dynamic_cast<const NoteOnEvent*>(e.get());
+    if (note_on) {
+      uint8_t v = note_on->key_;
+      if (range[0] > v) {
+        range[0] = v;
+      }
+      if (range[1] < v) {
+        range[1] = v;
+      }
+    }
+  }
+  return range;
+}
+
+std::array<uint8_t, 2> Track::GetVelocityRange() const {
+  std::array<uint8_t, 2> range{0xff, 0};
+  for (const auto &e: events_) {
+    const NoteOnEvent *note_on = dynamic_cast<const NoteOnEvent*>(e.get());
+    uint8_t v;
+    if (note_on && (v = note_on->velocity_) > 0) {
+      if (range[0] > v) {
+        range[0] = v;
+      }
+      if (range[1] < v) {
+        range[1] = v;
+      }
+    }
+  }
+  return range;
+}
+
 std::string Track::info(const std::string& indent) const {
   std::string s;
   size_t n_notes = 0;
-  int min_key = 0x100;
-  int max_key = 0;
-  int min_vel = 0x100;
-  int max_vel = 0;
-  std::set<uint8_t> channels;
   for (const auto &e: events_) {
     const MetaEvent *meta_event = dynamic_cast<const MetaEvent*>(e.get());
     const MidiEvent *midi_event = dynamic_cast<const MidiEvent*>(e.get());
@@ -107,11 +148,6 @@ std::string Track::info(const std::string& indent) const {
       if (note_on) {
         if (note_on->velocity_ > 0) {
           ++n_notes;
-          channels.insert(channels.end(), note_on->channel_);
-          if (min_key > note_on->key_) { min_key = note_on->key_; }
-          if (max_key < note_on->key_) { max_key = note_on->key_; }
-          if (min_vel > note_on->velocity_) { min_vel = note_on->velocity_; }
-          if (max_vel < note_on->velocity_) { max_vel = note_on->velocity_; }
         }
       } else if (!dynamic_cast<const NoteOffEvent*>(midi_event)) {
         s = fmt::format("{}{}{}\n", s, indent, midi_event->str());
@@ -121,10 +157,14 @@ std::string Track::info(const std::string& indent) const {
   if (n_notes == 0) {
     s = fmt::format("{}{}No notes\n", s, indent);
   } else {
+    std::vector<uint8_t> channels = GetChannels();
+    std::array<uint8_t, 2> key_range = GetKeyRange();
+    std::array<uint8_t, 2> vel_range = GetVelocityRange();
     s = fmt::format("{}{}Channels:", s, indent);
     for (uint8_t c: channels) { s = fmt::format("{} {}", s, int(c)); }
     s = fmt::format("{}\n{}{} notes, keys: [{}, {}], velocity: [{}, {}]\n",
-      s, indent, n_notes, min_key, max_key, min_vel, max_vel);
+      s, indent, n_notes,
+      key_range[0], key_range[1], vel_range[0], vel_range[1]);
   }
   return s;
 }
@@ -138,6 +178,17 @@ Midi::Midi(const std::string &midifile_path, uint32_t debug) :
   if (Valid()) {
     Parse();
   }
+}
+
+std::vector<uint8_t> Midi::GetChannels() const {
+  std::set<uint8_t> channels;
+  for (const Track& track: tracks_) {
+    std::vector<uint8_t> t_channels = track.GetChannels();
+    for (uint8_t c: t_channels) {
+      channels.insert(channels.end(), c);
+    }
+  }
+  return std::vector<uint8_t>(channels.begin(), channels.end()); 
 }
 
 std::string Midi::info(const std::string& indent) const {

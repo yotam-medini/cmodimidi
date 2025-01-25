@@ -202,6 +202,7 @@ class Player {
   void SetIndexEvents();
   uint32_t GetFirstNoteTime();
   void SetAbsEvents();
+  void Retune();
   void play();
   void HandleMeta(const midi::MetaEvent*, DynamicTiming&, uint32_t ts);
   void HandleMidi(
@@ -261,6 +262,9 @@ int Player::run() {
   SetIndexEvents();
   if (pp_.debug_ & 0x1) { std::cerr << "Player::run() end\n"; }
   SetAbsEvents();
+  if (pp_.tuning_ != 440) {
+    Retune();
+  }
   play();
   return rc_;
 }
@@ -337,6 +341,14 @@ void Player::SetAbsEvents() {
       std::cout << fmt::format("  [{:4d}] {}\n", i, abs_events_[i]->str());
     }
     std::cout << fmt::format("abs_events[{}]", nae) << "{\n";
+  }
+}
+
+void Player::Retune() {
+  const std::vector<uint8_t> channels = pm_.GetChannels();
+  if (pp_.debug_ & 0x1) {
+    std::cout << fmt::format("Retune {} channels to A4={}\n",
+      channels.size(), pp_.tuning_);
   }
 }
 

@@ -22,6 +22,7 @@ class Options {
   uint32_t delay_millisec() const;
   uint32_t batch_duration_millisec() const;
   float tempo() const;
+  unsigned tuning() const;
   uint32_t debug() const; // flags
   std::string midifile_path() const;
   std::string soundfonts_path() const;
