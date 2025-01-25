@@ -246,7 +246,6 @@ class Player {
 
   std::vector<IndexEvent> index_events_;
   std::vector<std::unique_ptr<AbsEvent>> abs_events_;
-  uint32_t final_ms_{0};
 
   std::array<int, SeqId_N>  seq_ids_;
   size_t next_send_index_{0};
@@ -302,7 +301,6 @@ void Player::SetAbsEvents() {
     500000,
     1000ull * uint64_t{pm_.GetTicksPerQuarterNote()},
     0, 0};
-  final_ms_ = 0;
   uint32_t first_note_time = GetFirstNoteTime();
   bool done = false;
   size_t ie_size = index_events_.size();
@@ -330,7 +328,7 @@ void Player::SetAbsEvents() {
     }
   }
   abs_events_.push_back(std::make_unique<FinalEvent>(
-    final_ms_ + 1,
+    abs_events_.empty() ? 0 : abs_events_.back()->end_time_ms() + 1,
     abs_events_.empty() ? 0 : abs_events_.back()->time_ms_original_ + 1));
   if (pp_.debug_ & 0x4) {
     const size_t nae = abs_events_.size();
@@ -412,7 +410,6 @@ void Player::HandleMidi(
         uint32_t duration_ticks = GetNoteDuration(index_event_index, *note_on);
         uint32_t duration_ms = dyn_timing.TicksToMs(duration_ticks);
         uint32_t duration_modified = FactorU32(pp_.tempo_div_factor_, duration_ms);
-        MaxBy(final_ms_, date_ms_modified + duration_modified);
         abs_events_.push_back(std::make_unique<NoteEvent>(
           date_ms_modified, date_ms,
           note_on->channel_, note_on->key_, note_on->velocity_,
@@ -423,7 +420,6 @@ void Player::HandleMidi(
    case midi::MidiVarByte::PROGRAM_CHANGE_x4: {
       const midi::ProgramChangeEvent* pc =
         dynamic_cast<const midi::ProgramChangeEvent*>(me);
-      MaxBy(final_ms_, date_ms_modified);
       abs_events_.push_back(std::make_unique<ProgramChange>(
         date_ms_modified, date_ms, pc->channel_, pc->number_));
     }
@@ -431,7 +427,6 @@ void Player::HandleMidi(
    case midi::MidiVarByte::PITCH_WHEEL_x6: {
       const midi::PitchWheelEvent* pw =
         dynamic_cast<const midi::PitchWheelEvent*>(me);
-      MaxBy(final_ms_, date_ms_modified);
       abs_events_.push_back(std::make_unique<PitchWheel>(
         date_ms_modified, date_ms, pw->channel_, pw->bend_));
     }
