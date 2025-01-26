@@ -98,6 +98,18 @@ std::vector<uint8_t> Track::GetChannels() const {
   return std::vector(channels.begin(), channels.end());
 }
 
+std::vector<uint8_t> Track::GetPrograms() const {
+  std::set<uint8_t> programs;
+  for (const auto &e: events_) {
+    const ProgramChangeEvent *prog_change =
+      dynamic_cast<const ProgramChangeEvent*>(e.get());
+    if (prog_change) {
+      programs.insert(programs.end(), prog_change->number_);
+    }
+  }
+  return std::vector(programs.begin(), programs.end());
+}
+
 std::array<uint8_t, 2> Track::GetKeyRange() const {
   std::array<uint8_t, 2> range{0xff, 0};
   for (const auto &e: events_) {
@@ -189,6 +201,17 @@ std::vector<uint8_t> Midi::GetChannels() const {
     }
   }
   return std::vector<uint8_t>(channels.begin(), channels.end()); 
+}
+
+std::vector<uint8_t> Midi::GetPrograms() const {
+  std::set<uint8_t> programs;
+  for (const Track& track: tracks_) {
+    std::vector<uint8_t> t_programs = track.GetPrograms();
+    for (uint8_t c: t_programs) {
+      programs.insert(programs.end(), c);
+    }
+  }
+  return std::vector<uint8_t>(programs.begin(), programs.end()); 
 }
 
 std::string Midi::info(const std::string& indent) const {

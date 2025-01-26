@@ -8,6 +8,7 @@
 #include <numeric>
 #include <tuple>
 #include <vector>
+#include <cmath>
 #include <fmt/core.h>
 #include <fluidsynth.h>
 #include "synthseq.h"
@@ -345,10 +346,59 @@ void Player::SetAbsEvents() {
 }
 
 void Player::Retune() {
-  const std::vector<uint8_t> channels = pm_.GetChannels();
+  const std::vector<uint8_t> programs = pm_.GetPrograms();
   if (pp_.debug_ & 0x1) {
-    std::cout << fmt::format("Retune {} channels to A4={}\n",
-      channels.size(), pp_.tuning_);
+    std::cout << fmt::format("Retune {} programs to A4={}\n",
+      programs.size(), pp_.tuning_);
+  }
+  int bank = 0;
+  int keys[0x80];
+  double pitches[0x80];
+  const size_t Akey = 69;
+  std::iota(&keys[0], &keys[0] + 0x80, 0);
+#if 0
+  // compute frequencies. But fluidsynth expects cents...
+  const double semitone = pow(2., 1./12.);
+  for (size_t base_note = Akey; base_note < Akey + 12; ++base_note) {
+    if (base_note == Akey) {
+      pitches[Akey] = pp_.tuning_;
+    } else {
+      pitches[base_note] = semitone * pitches[base_note - 1];
+    }
+    // up octaves
+    for (size_t note = base_note + 12; note < 0x80; note += 12) {
+      pitches[note] = 2. * pitches[note - 12];
+    }
+    // down octaves
+    for (size_t up_note = base_note, note = up_note - 12;
+        up_note >= 12; up_note = note, note -= 12) {
+      pitches[note] = (1./2.) * pitches[up_note];
+    }
+  }
+#endif
+  // Compute pitches cents. See: fluidsynth: src/synth/fluid_voice.c
+  // fluid_real_t fluid_voice_calculate_pitch(fluid_voice_t *voice, int key)
+  auto log2_ratio = log2(pp_.tuning_ / 440.);
+  pitches[Akey] = 100. * Akey + 1200. * log2_ratio;
+  for (size_t i = Akey + 1; i < 0x80; ++i) {
+    pitches[i] = pitches[i - 1] + 100.;
+  }
+  for (size_t i = Akey, im1 = i - 1; i > 0; i = im1--) {
+    pitches[i] = pitches[i + 1] - 100.;
+  }
+  for (size_t pi = 0; (rc_ == 0) && (pi < programs.size()); ++pi) {
+    uint8_t prog = std::max(100., pitches[pi]);
+    rc_ = fluid_synth_tune_notes(
+      ss_.synth_, bank, prog, 0x80, keys, pitches, 1);
+    if (rc_ != FLUID_OK) {
+      std::cerr << fmt::format("fluid_synth_tune_notes failed {}\n", rc_);
+    } else {
+      rc_ = fluid_synth_activate_tuning(ss_.synth_, 0, bank, prog, 1);
+      if (rc_ != FLUID_OK) {
+        std::cerr << fmt::format(
+          "fluid_synth_activate_tuning failed {}\n", rc_);
+      }
+    }
   }
 }
 

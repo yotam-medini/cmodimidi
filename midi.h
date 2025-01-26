@@ -364,6 +364,7 @@ class Track {
  public:
   std::vector<std::unique_ptr<Event>> events_;
   std::vector<uint8_t> GetChannels() const;
+  std::vector<uint8_t> GetPrograms() const;
   // empty range if range[0] > range[1]
   std::array<uint8_t, 2> GetKeyRange() const;
   std::array<uint8_t, 2> GetVelocityRange() const;
@@ -383,6 +384,7 @@ class Midi {
   uint16_t GetTicksPerFrame() const { return ticks_per_frame_; }
   const std::vector<Track> &GetTracks() const { return tracks_; }
   std::vector<uint8_t> GetChannels() const;
+  std::vector<uint8_t> GetPrograms() const;
   std::string info(const std::string& indent="") const;
   
  private:
