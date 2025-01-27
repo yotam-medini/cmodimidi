@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace midi {
@@ -373,6 +374,8 @@ class Track {
 
 class Midi {
  public:
+  using range_t = std::array<uint8_t, 2>;
+  using channels_range_t = std::unordered_map<uint8_t, range_t>;
   Midi(const std::string &path, uint32_t debug=0);
   std::string GetError() const { return error_; }
   bool Valid() const { return error_.empty(); }
@@ -385,6 +388,7 @@ class Midi {
   const std::vector<Track> &GetTracks() const { return tracks_; }
   std::vector<uint8_t> GetChannels() const;
   std::vector<uint8_t> GetPrograms() const;
+  channels_range_t GetChannelsRange() const;
   std::string info(const std::string& indent="") const;
   
  private:

@@ -9,6 +9,18 @@ namespace fs = std::filesystem;
 
 namespace midi {
 
+static void MinBy(uint8_t &v, uint8_t x) {
+  if (v > x) {
+    v = x;
+  }
+}
+
+static void MaxBy(uint8_t &v, uint8_t x) {
+  if (v < x) {
+    v = x;
+  }
+}
+
 std::string Event::dt_str() const {
   return fmt::format("DT={} {}", delta_time_, str());
 }
@@ -116,12 +128,8 @@ std::array<uint8_t, 2> Track::GetKeyRange() const {
     const NoteOnEvent *note_on = dynamic_cast<const NoteOnEvent*>(e.get());
     if (note_on) {
       uint8_t v = note_on->key_;
-      if (range[0] > v) {
-        range[0] = v;
-      }
-      if (range[1] < v) {
-        range[1] = v;
-      }
+      MinBy(range[0], v);
+      MaxBy(range[1], v);
     }
   }
   return range;
@@ -133,12 +141,8 @@ std::array<uint8_t, 2> Track::GetVelocityRange() const {
     const NoteOnEvent *note_on = dynamic_cast<const NoteOnEvent*>(e.get());
     uint8_t v;
     if (note_on && (v = note_on->velocity_) > 0) {
-      if (range[0] > v) {
-        range[0] = v;
-      }
-      if (range[1] < v) {
-        range[1] = v;
-      }
+      MinBy(range[0], v);
+      MaxBy(range[1], v);
     }
   }
   return range;
@@ -214,6 +218,27 @@ std::vector<uint8_t> Midi::GetPrograms() const {
   return std::vector<uint8_t>(programs.begin(), programs.end()); 
 }
 
+Midi::channels_range_t Midi::GetChannelsRange() const {
+  channels_range_t channels_range;
+  for (const Track& track: tracks_) {
+    for (const auto &e: track.events_) {
+      const NoteOnEvent *note_on = dynamic_cast<const NoteOnEvent*>(e.get());
+      uint8_t v;
+      if (note_on && ((v = note_on->velocity_) > 0)) {
+        auto iter = channels_range.find(note_on->channel_);
+        if (iter == channels_range.end()) {
+          channels_range.insert({note_on->channel_, {v, v}});
+        } else {
+          range_t &range = iter->second;
+          MinBy(range[0], v);
+          MinBy(range[1], v);
+        }
+      }
+    }
+  }
+  return channels_range;
+}
+
 std::string Midi::info(const std::string& indent) const {
   const std::string sub_indent{indent + std::string("  ")};
   std::string s = fmt::format("{}Format={} ntrks={}, Ticks Per (1/4)={}\n",
@@ -221,6 +246,21 @@ std::string Midi::info(const std::string& indent) const {
   for (size_t ti = 0; ti < tracks_.size(); ++ti) {
     s = fmt::format("{}{}Track[{}] {}", s, indent, ti, "{\n");
     s = fmt::format("{}{}", s, tracks_[ti].info(sub_indent));
+    s = fmt::format("{}{}{}", s, indent, "}\n");
+  }
+  const channels_range_t channels_range = GetChannelsRange();
+  if (!channels_range.empty()) {
+    std::vector<uint8_t> channels;
+    for (const auto &kv: channels_range) {
+      channels.push_back(kv.first);
+    }
+    std::sort(channels.begin(), channels.end());
+    s = fmt::format("{}{}{} channels: {}", s, indent, channels.size(), "{\n");
+    for (uint8_t channel: channels) {
+      const range_t &range = channels_range.find(channel)->second;
+      s = fmt::format("{}{} channel={} velocity=[{}, {}]\n",
+        s, indent, channel, range[0], range[1]);
+    }
     s = fmt::format("{}{}{}", s, indent, "}\n");
   }
   return s;
