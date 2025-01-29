@@ -185,6 +185,27 @@ class CallBackData {
 };
 
 ////////////////////////////////////////////////////////////////////////
+class Affine {
+ public:
+  using range_t = std::array<uint8_t, 2>;
+  Affine(const range_t& source, const range_t &target) :
+    s0_{source[0]},
+    t0_{target[0]},
+    ds_{uint32_t{source[1]} + 1 - s0_},
+    dt_{uint32_t{target[1]} + 1 - t0_} {
+  }
+  uint8_t map(uint8_t s) const {
+    uint32_t t = t0_ + ((uint32_t(s) - s0_)*ds_)/dt_;
+    return static_cast<uint8_t>(t);
+  }
+ private:
+  uint32_t s0_;
+  uint32_t t0_;
+  uint32_t ds_;
+  uint32_t dt_;
+};
+ 
+////////////////////////////////////////////////////////////////////////
 
 class Player {
  public:
@@ -200,11 +221,14 @@ class Player {
   int run();
 
  private:
+  using range_t = std::array<uint8_t, 2>;
+  using key2affine_t = std::unordered_map<uint8_t, Affine>;
   void SetIndexEvents();
   uint32_t GetFirstNoteTime();
   void SetAbsEvents();
   void Retune();
   void play();
+  void SetVelocitiesMap();
   void HandleMeta(const midi::MetaEvent*, DynamicTiming&, uint32_t ts);
   void HandleMidi(
     const midi::MidiEvent*,
@@ -245,6 +269,8 @@ class Player {
   const midi::Midi &pm_; // parsed_midi
   SynthSequencer &ss_;
   const PlayParams &pp_;
+  key2affine_t tracks_velocity_map_;
+  key2affine_t channels_velocity_map_;
 
   std::vector<IndexEvent> index_events_;
   std::vector<std::unique_ptr<AbsEvent>> abs_events_;
@@ -424,6 +450,33 @@ void Player::play() {
   cv_.wait(lock, [this]{ return final_handled_; });
   if (pp_.progress_) { std::cout << '\n'; }
   if (pp_.debug_ & 0x2) { std::cout << "unlocked\n"; }
+}
+
+void Player::SetVelocitiesMap() {
+  auto const &tmap = pp_.tracks_velocity_map_;
+  if (!tmap.empty()) {
+    auto const channels_range = pm_.GetChannelsRange();
+    for (size_t ti = 0, nt = pm_.GetNumTracks(); ti < nt; ++ti) {
+      auto iter = tmap.find(ti);
+      if (iter != tmap.end()) {
+        const range_t orig_range = pm_.GetTracks()[ti].GetVelocityRange();
+        const range_t &target_range = iter->second;
+        tracks_velocity_map_.insert({ti, Affine{orig_range, target_range}});
+      }
+    }
+  }
+  auto const &cmap = pp_.channels_velocity_map_;
+  if (!cmap.empty()) {
+    auto const channels_range = pm_.GetChannelsRange();
+    for (auto const &[channel, orig_range]: channels_range) {
+      auto iter = cmap.find(channel);
+      if (iter != cmap.end()) {
+        const range_t &target_range = iter->second;
+        channels_velocity_map_.insert(
+          {channel, Affine{orig_range, target_range}});
+      }
+    }
+  }
 }
 
 uint32_t Player::GetFirstNoteTime() {

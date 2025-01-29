@@ -46,6 +46,8 @@ int main(int argc, char **argv) {
         pp.end_ms_ = options.EndMillisec();
         pp.tempo_div_factor_ = 1./options.Tempo();
         pp.tuning_ = options.Tuning();
+        pp.tracks_velocity_map_ = options.GetTracksVelocityMap();
+        pp.channels_velocity_map_ = options.GetChannelsVelocityMap();
         pp.initial_delay_ms_ = options.DelayMillisec();
         pp.batch_duration_ms_ = options.BatchDurationMillisec();
         pp.progress_ = options.Progress();

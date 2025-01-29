@@ -31,6 +31,7 @@ struct OptionMilliSec {
 std::istream& operator>>(std::istream& is, OptionMilliSec& opt) {
   opt.valid_ = false;
   std::string s;
+  is >> s;
   if (s.empty()) {
     opt.ms_ = INFINITE_MINUTES_MILLIES;
   } else {
@@ -94,7 +95,6 @@ struct U8ToRange {
 std::istream& operator>>(std::istream& is, U8ToRange& u2r) {
   std::string s;
   is >> s;
-  is >> s;
   u2r.key_ = 0;
   u2r.range_ = {0xff, 0};
   size_t colon = s.find(':');
@@ -149,7 +149,7 @@ class _OptionsImpl {
   _OptionsImpl(int argc, char **argv) {
     AddOptions();
     // last argument - the midi file
-    pos_desc_.add("midifile", 1);
+    pos_desc_.add("midifile", -1);
     po::store(po::command_line_parser(argc, argv)
         .options(desc_)
         .positional(pos_desc_)
@@ -209,12 +209,10 @@ class _OptionsImpl {
     return v;
   }
   k2range_t GetTracksVelocityMap() const {
-    k2range_t k2vel;
-    return k2vel;
+    return GetKeysVelocityMap("tmap");
   }
   k2range_t GetChannelsVelocityMap() const {
-    k2range_t k2vel;
-    return k2vel;
+    return GetKeysVelocityMap("cmap");
   }
   uint32_t Debug() const {
     auto raw = vm_["debug"].as<std::string>();
@@ -231,6 +229,22 @@ class _OptionsImpl {
   void AddOptions();
   uint32_t GetMilli(const char *key) const {
     return vm_[key].as<OptionMilliSec>().ms_;
+  }
+  k2range_t GetKeysVelocityMap(const char *name) const {
+    k2range_t k2vel;
+    if (vm_.count(name) > 0) {
+      const auto keys_ranges = vm_[name].as<std::vector<U8ToRange>>();
+      for (const U8ToRange &utr: keys_ranges) {
+        if (utr.Valid()) {
+          if (k2vel.find(utr.key_) != k2vel.end()) {
+            std::cerr << fmt::format("Warning: {} multiply defined in {}",
+              utr.key_, name);
+          }
+          k2vel.insert({utr.key_, utr.range_});
+        }
+      }
+    }
+    return k2vel;
   }
   po::options_description desc_;
   po::positional_options_description pos_desc_;
@@ -263,10 +277,10 @@ void _OptionsImpl::AddOptions() {
        "Tuning - frequency of A4 (central La)")
     ("tmap",
        po::value<std::vector<U8ToRange>>()->multitoken(),
-       "Track velocity mappings <track>:<low>[,<high>]")
+       "Tracks velocity mappings <track>:<low>[,<high>]")
     ("cmap",
        po::value<std::vector<U8ToRange>>()->multitoken(),
-       "Channel velocity mappings <track>:<low>[,<high>]")
+       "Channels velocity mappings <track>:<low>[,<high>]")
     ("soundfont,s",
        po::value<std::string>()->default_value(
          "/usr/share/sounds/sf2/FluidR3_GM.sf2"),
