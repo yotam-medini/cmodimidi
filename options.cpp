@@ -31,7 +31,6 @@ struct OptionMilliSec {
 std::istream& operator>>(std::istream& is, OptionMilliSec& opt) {
   opt.valid_ = false;
   std::string s;
-  is >> s;
   if (s.empty()) {
     opt.ms_ = INFINITE_MINUTES_MILLIES;
   } else {
@@ -81,6 +80,66 @@ std::ostream& operator<<(std::ostream& os, const OptionMilliSec& opt) {
   } else {
     os << "invalid OptionMilliSec";
   }
+  return os;
+}
+
+struct U8ToRange {
+  U8ToRange(uint8_t key=0, uint8_t low=0xff, uint8_t high=0) :
+    key_{key_}, range_{low, high} {}
+  bool valid() const { return range_[0] <= range_[1]; }
+  uint8_t key_;
+  std::array<uint8_t, 2> range_{0xff, 0};
+};
+
+std::istream& operator>>(std::istream& is, U8ToRange& u2r) {
+  std::string s;
+  is >> s;
+  is >> s;
+  u2r.key_ = 0;
+  u2r.range_ = {0xff, 0};
+  size_t colon = s.find(':');
+  if (colon == std::string::npos) {
+    std::cerr << fmt::format("U8ToRange missing colon in {}", s);
+  } else {
+    uint8_t u8;
+    auto pec = std::from_chars(s.data(), s.data() + colon, u8);
+    if (pec.ec != std::errc()) {
+      std::cerr << fmt::format("U8ToRange: Bad key in {}\n", s);
+    } else {
+      u2r.key_ = u8;
+      std::string tail = s.substr(colon + 1);
+      size_t comma = tail.find(',');
+      if (comma == std::string::npos) {
+        pec = std::from_chars(tail.data(), tail.data() + tail.size(), u8);
+        if (pec.ec != std::errc()) {
+          std::cerr << fmt::format("U8ToRange: Bad range in {}\n", s);
+        } else {
+          u2r.range_ = {u8, u8};
+        }
+      } else {
+        pec = std::from_chars(tail.data(), tail.data() + comma, u8);
+        if (pec.ec != std::errc()) {
+          std::cerr << fmt::format("U8ToRange: Bad low in {}\n", s);
+        } else {
+          u2r.range_[0] = u8;
+          pec = std::from_chars(
+            tail.data() + comma + 1, tail.data() + tail.size(), u8);
+          if (pec.ec != std::errc()) {
+            std::cerr << fmt::format("U8ToRange: Bad high in {}\n", s);
+            u2r.range_[0] = 0xff;
+          } else {
+            u2r.range_[1] = u8;
+          }
+        }
+      }
+    }
+  }
+  return is;
+}
+
+std::ostream& operator<<(std::ostream& os, const U8ToRange& u2r) {
+  os << fmt::format("{}{}:{},{}",
+    (u2r.valid() ? "" : "(Invalid)"), u2r.key_, u2r.range_[0], u2r.range_[1]);
   return os;
 }
 
