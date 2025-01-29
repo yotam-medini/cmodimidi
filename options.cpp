@@ -265,7 +265,7 @@ void _OptionsImpl::AddOptions() {
   desc_.add_options()
     ("help,h", "produce help message")
     ("midifile", po::value<std::string>(),
-       "Positional argument. Path the midi file to be played")
+       "Positional argument. Path of the midi file to be played")
     ("begin,b", 
       po::value<OptionMilliSec>()->default_value(OptionMilliSec{true, 0}),
       "start time [minutes]:seconds[.millisecs]")
