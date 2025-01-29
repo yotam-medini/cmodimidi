@@ -208,6 +208,16 @@ class _OptionsImpl {
     }
     return v;
   }
+  int8_t KeyShift() const {
+    int raw = vm_["adjust-key"].as<int>();
+    int8_t key_shift{0};
+    if ((raw < -24) || (24 < raw)) {
+      std::cerr << fmt::format("adjust-key value {} not in [-24, 24]\n", raw);
+    } else {
+      key_shift = static_cast<int8_t>(raw);
+    }
+    return key_shift;
+  }
   k2range_t GetTracksVelocityMap() const {
     return GetKeysVelocityMap("tmap");
   }
@@ -272,6 +282,9 @@ void _OptionsImpl::AddOptions() {
     ("tempo,T",
        po::value<float>()->default_value(1.),
        "Speed Multiplier factor")
+    ("adjust-key,K",
+       po::value<int>()->default_value(0),
+       "Addjust key, tranpose by n semitones")
     ("tuning",
        po::value<unsigned>()->default_value(440),
        "Tuning - frequency of A4 (central La)")
@@ -351,6 +364,10 @@ uint32_t Options::BatchDurationMillisec() const {
 
 float Options::Tempo() const {
   return p_->Tempo();
+}
+
+int8_t Options::KeyShift() const {
+  return p_->KeyShift();
 }
 
 unsigned Options::Tuning() const {

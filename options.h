@@ -26,6 +26,7 @@ class Options {
   uint32_t DelayMillisec() const;
   uint32_t BatchDurationMillisec() const;
   float Tempo() const;
+  int8_t KeyShift() const;
   unsigned Tuning() const;
   k2range_t GetTracksVelocityMap() const;
   k2range_t GetChannelsVelocityMap() const;

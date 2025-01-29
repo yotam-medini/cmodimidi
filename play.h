@@ -10,6 +10,7 @@ class PlayParams {
   uint32_t begin_ms_{0};
   uint32_t end_ms_{0};
   float tempo_div_factor_{1.0};
+  int8_t key_shift_{0};
   unsigned tuning_{440};
   Options::k2range_t tracks_velocity_map_;
   Options::k2range_t channels_velocity_map_;

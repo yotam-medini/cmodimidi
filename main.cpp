@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
         pp.begin_ms_ = options.BeginMillisec();
         pp.end_ms_ = options.EndMillisec();
         pp.tempo_div_factor_ = 1./options.Tempo();
+        pp.key_shift_ = options.KeyShift();
         pp.tuning_ = options.Tuning();
         pp.tracks_velocity_map_ = options.GetTracksVelocityMap();
         pp.channels_velocity_map_ = options.GetChannelsVelocityMap();

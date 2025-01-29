@@ -457,6 +457,7 @@ void Player::play() {
 void Player::SetVelocitiesMap() {
   auto const &tmap = pp_.tracks_velocity_map_;
   if (!tmap.empty()) {
+    if (pp_.debug_ & 0x1) {std::cerr<<fmt::format("#(tmap)={}\n", tmap.size());}
     auto const channels_range = pm_.GetChannelsRange();
     for (size_t ti = 0, nt = pm_.GetNumTracks(); ti < nt; ++ti) {
       auto iter = tmap.find(ti);
@@ -469,6 +470,7 @@ void Player::SetVelocitiesMap() {
   }
   auto const &cmap = pp_.channels_velocity_map_;
   if (!cmap.empty()) {
+    if (pp_.debug_ & 0x1) {std::cerr<<fmt::format("#(cmap)={}\n", cmap.size());}
     auto const channels_range = pm_.GetChannelsRange();
     for (auto const &[channel, orig_range]: channels_range) {
       auto iter = cmap.find(channel);
@@ -528,11 +530,12 @@ void Player::HandleMidi(
         uint32_t duration_ms = dyn_timing.TicksToMs(duration_ticks);
         uint32_t duration_modified =
           FactorU32(pp_.tempo_div_factor_, duration_ms);
+        uint8_t key = static_cast<uint8_t>(int(note_on->key_) + pp_.key_shift_);
         uint8_t itrack = index_events_[index_event_index].track_;
         uint8_t velocity = MapVelocity(note_on, itrack);
         abs_events_.push_back(std::make_unique<NoteEvent>(
           date_ms_modified, date_ms,
-          note_on->channel_, note_on->key_, velocity,
+          note_on->channel_, key, velocity,
           duration_modified, duration_ms));
       }
     }
