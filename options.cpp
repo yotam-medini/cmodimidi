@@ -145,6 +145,7 @@ std::ostream& operator<<(std::ostream& os, const U8ToRange& u2r) {
 
 class _OptionsImpl {
  public:
+  using k2range_t = Options::k2range_t;
   _OptionsImpl(int argc, char **argv) {
     AddOptions();
     // last argument - the midi file
@@ -206,6 +207,14 @@ class _OptionsImpl {
         v, tuning_max);
     }
     return v;
+  }
+  k2range_t GetTracksVelocityMap() const {
+    k2range_t k2vel;
+    return k2vel;
+  }
+  k2range_t GetChannelsVelocityMap() const {
+    k2range_t k2vel;
+    return k2vel;
   }
   uint32_t Debug() const {
     auto raw = vm_["debug"].as<std::string>();
@@ -332,6 +341,14 @@ float Options::Tempo() const {
 
 unsigned Options::Tuning() const {
   return p_->Tuning();
+}
+
+Options::k2range_t Options::GetTracksVelocityMap() const {
+  return p_->GetTracksVelocityMap();
+}
+
+Options::k2range_t Options::GetChannelsVelocityMap() const {
+  return p_->GetChannelsVelocityMap();
 }
 
 uint32_t Options::Debug() const {
