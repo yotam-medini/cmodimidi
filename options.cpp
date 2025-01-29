@@ -86,7 +86,7 @@ std::ostream& operator<<(std::ostream& os, const OptionMilliSec& opt) {
 struct U8ToRange {
   U8ToRange(uint8_t key=0, uint8_t low=0xff, uint8_t high=0) :
     key_{key_}, range_{low, high} {}
-  bool valid() const { return range_[0] <= range_[1]; }
+  bool Valid() const { return range_[0] <= range_[1]; }
   uint8_t key_;
   std::array<uint8_t, 2> range_{0xff, 0};
 };
@@ -139,7 +139,7 @@ std::istream& operator>>(std::istream& is, U8ToRange& u2r) {
 
 std::ostream& operator<<(std::ostream& os, const U8ToRange& u2r) {
   os << fmt::format("{}{}:{},{}",
-    (u2r.valid() ? "" : "(Invalid)"), u2r.key_, u2r.range_[0], u2r.range_[1]);
+    (u2r.Valid() ? "" : "(Invalid)"), u2r.key_, u2r.range_[0], u2r.range_[1]);
   return os;
 }
 
@@ -156,13 +156,13 @@ class _OptionsImpl {
       vm_);
     po::notify(vm_);
   }
-  bool help() const { return vm_.count("help"); }
-  std::string description() const {
+  bool Help() const { return vm_.count("help"); }
+  std::string Description() const {
     std::ostringstream oss;
     oss << desc_;
     return oss.str();
   }
-  bool valid() const {
+  bool Valid() const {
     bool v = vm_.count("midifile") > 0;
     if (!v) { std::cerr << "Missing midifile\n"; }
     for (const char *key: {"begin", "end", "delay", "batch-duration"}) {
@@ -175,15 +175,15 @@ class _OptionsImpl {
     }
     return v;
   }
-  bool info() const { return vm_["info"].as<bool>(); }
-  std::string dump_path() const { return vm_["dump"].as<std::string>(); }
-  bool play() const { return !(vm_["noplay"].as<bool>()); }
-  bool progress() const { return vm_["progress"].as<bool>(); }
-  uint32_t begin_millisec() const { return GetMilli("begin"); }
-  uint32_t end_millisec() const { return GetMilli("end"); }
-  uint32_t delay_millisec() const { return GetMilli("delay"); }
-  uint32_t batch_duration_millisec() const { return GetMilli("batch-duration"); }
-  float tempo() const {
+  bool Info() const { return vm_["info"].as<bool>(); }
+  std::string DumpPath() const { return vm_["dump"].as<std::string>(); }
+  bool Play() const { return !(vm_["noplay"].as<bool>()); }
+  bool Progress() const { return vm_["progress"].as<bool>(); }
+  uint32_t BeginMillisec() const { return GetMilli("begin"); }
+  uint32_t EndMillisec() const { return GetMilli("end"); }
+  uint32_t DelayMillisec() const { return GetMilli("delay"); }
+  uint32_t BatchDurationMillisec() const { return GetMilli("batch-duration"); }
+  float Tempo() const {
     static float tempo_min = 1./8.;
     static float tempo_max = 8;
     float v = vm_["tempo"].as<float>();
@@ -194,7 +194,7 @@ class _OptionsImpl {
     }
     return v;
   }
-  unsigned tuning() const {
+  unsigned Tuning() const {
     static unsigned tuning_min = 300.;
     static unsigned tuning_max = 480;
     unsigned v = vm_["tuning"].as<unsigned>();
@@ -207,15 +207,15 @@ class _OptionsImpl {
     }
     return v;
   }
-  uint32_t debug() const {
+  uint32_t Debug() const {
     auto raw = vm_["debug"].as<std::string>();
     uint32_t flags = std::stoi(raw, nullptr, 0);
     return flags;
   }
-  std::string soundfonts_path() const {
+  std::string SoundfontsPath() const {
     return vm_["soundfont"].as<std::string>();
   }
-  std::string midifile_path() const {
+  std::string MidifilePath() const {
     return vm_["midifile"].as<std::string>();
   }
  private:
@@ -252,6 +252,12 @@ void _OptionsImpl::AddOptions() {
     ("tuning",
        po::value<unsigned>()->default_value(440),
        "Tuning - frequency of A4 (central La)")
+    ("tmap",
+       po::value<std::vector<U8ToRange>>()->multitoken(),
+       "Track velocity mappings <track>:<low>[,<high>]")
+    ("cmap",
+       po::value<std::vector<U8ToRange>>()->multitoken(),
+       "Channel velocity mappings <track>:<low>[,<high>]")
     ("soundfont,s",
        po::value<std::string>()->default_value(
          "/usr/share/sounds/sf2/FluidR3_GM.sf2"),
@@ -276,67 +282,67 @@ Options::~Options() {
   delete p_;
 }
 
-std::string Options::description() const {
-  return p_->description();
+std::string Options::Description() const {
+  return p_->Description();
 }
 
-bool Options::valid() const {
-  return p_->valid();
+bool Options::Valid() const {
+  return p_->Valid();
 }
 
-bool Options::help() const {
-  return p_->help();
+bool Options::Help() const {
+  return p_->Help();
 }
 
-bool Options::info() const {
-  return p_->info();
+bool Options::Info() const {
+  return p_->Info();
 }
 
-std::string Options::dump_path() const {
-  return p_->dump_path();
+std::string Options::DumpPath() const {
+  return p_->DumpPath();
 }
 
-bool Options::play() const {
-  return p_->play();
+bool Options::Play() const {
+  return p_->Play();
 }
 
-bool Options::progress() const {
-  return p_->progress();
+bool Options::Progress() const {
+  return p_->Progress();
 }
 
-uint32_t Options::begin_millisec() const {
-  return p_->begin_millisec();
+uint32_t Options::BeginMillisec() const {
+  return p_->BeginMillisec();
 }
 
-uint32_t Options::end_millisec() const {
-  return p_->end_millisec();
+uint32_t Options::EndMillisec() const {
+  return p_->EndMillisec();
 }
 
-uint32_t Options::delay_millisec() const {
-  return p_->delay_millisec();
+uint32_t Options::DelayMillisec() const {
+  return p_->DelayMillisec();
 }
 
-uint32_t Options::batch_duration_millisec() const {
-  return p_->batch_duration_millisec();
+uint32_t Options::BatchDurationMillisec() const {
+  return p_->BatchDurationMillisec();
 }
 
-float Options::tempo() const {
-  return p_->tempo();
+float Options::Tempo() const {
+  return p_->Tempo();
 }
 
-unsigned Options::tuning() const {
-  return p_->tuning();
+unsigned Options::Tuning() const {
+  return p_->Tuning();
 }
 
-uint32_t Options::debug() const {
-  return p_->debug();
+uint32_t Options::Debug() const {
+  return p_->Debug();
 }
 
-std::string Options::midifile_path() const {
-  return p_->midifile_path();
+std::string Options::MidifilePath() const {
+  return p_->MidifilePath();
 }
 
-std::string Options::soundfonts_path() const {
-  return p_->soundfonts_path();
+std::string Options::SoundfontsPath() const {
+  return p_->SoundfontsPath();
 }
 
