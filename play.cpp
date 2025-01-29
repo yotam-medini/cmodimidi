@@ -194,7 +194,7 @@ class Affine {
     ds_{uint32_t{source[1]} + 1 - s0_},
     dt_{uint32_t{target[1]} + 1 - t0_} {
   }
-  uint8_t map(uint8_t s) const {
+  uint8_t Map(uint8_t s) const {
     uint32_t t = t0_ + ((uint32_t(s) - s0_)*ds_)/dt_;
     return static_cast<uint8_t>(t);
   }
@@ -236,6 +236,7 @@ class Player {
     size_t index_event_index,
     uint32_t date_ms);
   uint32_t GetNoteDuration(size_t iei, const midi::NoteOnEvent &note_on) const;
+  uint8_t MapVelocity(const midi::NoteOnEvent *note_on, uint8_t itrack) const;
   static uint32_t FactorU32(double f, uint32_t u);
   static void MaxBy(uint32_t &v, uint32_t x) { if (v < x) { v = x; } }
 
@@ -333,6 +334,7 @@ void Player::SetAbsEvents() {
     1000ull * uint64_t{pm_.GetTicksPerQuarterNote()},
     0, 0};
   uint32_t first_note_time = GetFirstNoteTime();
+  SetVelocitiesMap();
   bool done = false;
   size_t ie_size = index_events_.size();
   auto safe_subtract = [](uint32_t l, uint32_t r) { return l < r ? 0 : l - r; };
@@ -524,10 +526,13 @@ void Player::HandleMidi(
       if (after_begin && note_on->velocity_ != 0) {
         uint32_t duration_ticks = GetNoteDuration(index_event_index, *note_on);
         uint32_t duration_ms = dyn_timing.TicksToMs(duration_ticks);
-        uint32_t duration_modified = FactorU32(pp_.tempo_div_factor_, duration_ms);
+        uint32_t duration_modified =
+          FactorU32(pp_.tempo_div_factor_, duration_ms);
+        uint8_t itrack = index_events_[index_event_index].track_;
+        uint8_t velocity = MapVelocity(note_on, itrack);
         abs_events_.push_back(std::make_unique<NoteEvent>(
           date_ms_modified, date_ms,
-          note_on->channel_, note_on->key_, note_on->velocity_,
+          note_on->channel_, note_on->key_, velocity,
           duration_modified, duration_ms));
       }
     }
@@ -576,6 +581,20 @@ uint32_t Player::GetNoteDuration(
   }
   uint32_t dur = curr_time - index_events_[iei].time_;
   return dur;
+}
+
+uint8_t Player::MapVelocity(
+    const midi::NoteOnEvent *note_on,
+    uint8_t itrack) const {
+  uint8_t velocity = note_on->velocity_;
+  auto iter = channels_velocity_map_.find(note_on->channel_);
+  if (iter == channels_velocity_map_.end()) {
+    iter = tracks_velocity_map_.find(itrack);
+  }
+  if (iter != tracks_velocity_map_.end()) {
+    velocity = iter->second.Map(velocity);
+  }
+  return velocity;
 }
 
 void Player::ScheduleCallback(int seq_id, uint32_t at) {
