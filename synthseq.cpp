@@ -39,9 +39,14 @@ SynthSequencer::SynthSequencer(
 }
 
 SynthSequencer::~SynthSequencer() {
+  DeleteFluidObjects();
+}
+
+void SynthSequencer::DeleteFluidObjects() {
   if (synth_seq_id_ != -1) {
-    if (debug_ & 0x1) { std::cerr<<"call fluid_sequencer_unregister_clientn"; }
+    if (debug_ & 0x1) { std::cerr<<"call fluid_sequencer_unregister_client\n"; }
     fluid_sequencer_unregister_client(sequencer_, synth_seq_id_);
+    synth_seq_id_ = -1;
   }
   if (sequencer_) {
     if (debug_ & 0x1) { std::cerr << "call delete_fluid_sequencer\n"; }
@@ -56,6 +61,7 @@ SynthSequencer::~SynthSequencer() {
   if (sfont_id_ != -1) {
     if (debug_ & 0x1) { std::cerr << "call fluid_synth_sfunload\n"; }
     fluid_synth_sfunload(synth_, sfont_id_, 0);
+    sfont_id_ = -1;
   }
   if (synth_) {
     if (debug_ & 0x1) { std::cerr << "call delete_fluid_synth\n"; }

@@ -10,6 +10,7 @@ class SynthSequencer {
   SynthSequencer(const std::string &sound_font_path, uint32_t debug);
   ~SynthSequencer();
   bool ok() const { return error_.empty(); }
+  void DeleteFluidObjects();
   const std::string &error() const { return error_; }
   fluid_settings_t *settings_{nullptr};
   fluid_synth_t *synth_{nullptr};
