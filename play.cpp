@@ -1,6 +1,7 @@
 #include "play.h"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <condition_variable>
 #include <iostream>
 #include <iostream>
@@ -279,7 +280,7 @@ class Player {
   std::array<int, SeqId_N>  seq_ids_;
   size_t next_send_index_{0};
   uint32_t date_add_ms_{0};
-  bool final_handled_{false};
+  std::atomic<bool> final_handled_{false};
   std::mutex sending_mtx_;
   std::mutex play_mtx_;
   std::condition_variable cv_;
@@ -449,7 +450,7 @@ void Player::play() {
     ScheduleProgressAt(100);
   }
   if (pp_.debug_ & 0x2) { std::cout << "wait on lock\n"; }
-  cv_.wait(lock, [this]{ return final_handled_; });
+  cv_.wait(lock, [this]{ return final_handled_.load(); });
   if (pp_.progress_) { std::cout << '\n'; }
   if (pp_.debug_ & 0x2) { std::cout << "unlocked\n"; }
 }
@@ -667,14 +668,18 @@ void Player::final_callback(
     fluid_event_t *event,
     fluid_sequencer_t *seq) {
   if (pp_.debug_ & 0x2) { std::cout << "final_callback\n"; } 
-  final_handled_ = true;
-  for (size_t seqii = 0; seqii < SeqId_N; ++seqii) {
-    int seq_id = seq_ids_[seqii];
-    fluid_sequencer_remove_events(ss_.sequencer_, -1, seq_id, -1);
-    fluid_sequencer_unregister_client(ss_.sequencer_, seq_id);
+  bool handled = final_handled_.exchange(true);
+  if (!handled) {
+    for (size_t seqii = 0; seqii < SeqId_N; ++seqii) {
+      int seq_id = seq_ids_[seqii];
+      if (seq_id != -1) {
+        fluid_sequencer_remove_events(ss_.sequencer_, -1, seq_id, -1);
+        fluid_sequencer_unregister_client(ss_.sequencer_, seq_id);
+      }
+    }
+    if (pp_.debug_ & 0x2) { std::cout << "final_callback notify\n"; } 
+    cv_.notify_one();
   }
-  if (pp_.debug_ & 0x2) { std::cout << "final_callback notify\n"; } 
-  cv_.notify_one();
 }
 
 void Player::progress_callback(

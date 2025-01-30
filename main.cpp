@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     std::cerr << options.Description();
     rc = 1;
   } else {
-    uint32_t debug = options.Debug();
+    const uint32_t debug = options.Debug();
     if (debug) { 
       std::cout << fmt::format("debug=0x{:x}, b={}, e={}\n",
         debug, options.BeginMillisec(), options.EndMillisec());
@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
       }
     }
     if ((rc == 0) && options.Play()) {
-      SynthSequencer synth_sequencer(options.SoundfontsPath());
+      SynthSequencer synth_sequencer(options.SoundfontsPath(), debug);
       if (synth_sequencer.ok()) {
         PlayParams pp;
         pp.begin_ms_ = options.BeginMillisec();

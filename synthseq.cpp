@@ -1,9 +1,13 @@
 #include "synthseq.h"
+#include <iostream>
 #include <fmt/core.h>
 #include <fluidsynth.h>
 // #include <fluidsynth/settings.h>
 
-SynthSequencer::SynthSequencer(const std::string &sound_font_path) {
+SynthSequencer::SynthSequencer(
+    const std::string &sound_font_path,
+    uint32_t debug) : 
+    debug_{debug} {
   settings_ = new_fluid_settings();
   int fs_rc;
   if (ok()) {
@@ -43,6 +47,7 @@ SynthSequencer::~SynthSequencer() {
     sequencer_ = nullptr;
   }
   if (audio_driver_) {
+    if (debug_ & 0x1) { std::cerr << "call delete_fluid_audio_driver\n"; }
     delete_fluid_audio_driver(audio_driver_);
     audio_driver_ = nullptr;
   }

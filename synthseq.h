@@ -7,7 +7,7 @@
 
 class SynthSequencer {
  public:
-  SynthSequencer(const std::string &sound_font_path);
+  SynthSequencer(const std::string &sound_font_path, uint32_t debug);
   ~SynthSequencer();
   bool ok() const { return error_.empty(); }
   const std::string &error() const { return error_; }
@@ -19,4 +19,5 @@ class SynthSequencer {
   int16_t sfont_id_{-1};
  private:
   std::string error_;
+  const uint32_t debug_{0};
 };
