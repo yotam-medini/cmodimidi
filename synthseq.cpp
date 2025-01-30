@@ -40,9 +40,11 @@ SynthSequencer::SynthSequencer(
 
 SynthSequencer::~SynthSequencer() {
   if (synth_seq_id_ != -1) {
+    if (debug_ & 0x1) { std::cerr<<"call fluid_sequencer_unregister_clientn"; }
     fluid_sequencer_unregister_client(sequencer_, synth_seq_id_);
   }
   if (sequencer_) {
+    if (debug_ & 0x1) { std::cerr << "call delete_fluid_sequencer\n"; }
     delete_fluid_sequencer(sequencer_);
     sequencer_ = nullptr;
   }
@@ -52,13 +54,16 @@ SynthSequencer::~SynthSequencer() {
     audio_driver_ = nullptr;
   }
   if (sfont_id_ != -1) {
+    if (debug_ & 0x1) { std::cerr << "call fluid_synth_sfunload\n"; }
     fluid_synth_sfunload(synth_, sfont_id_, 0);
   }
   if (synth_) {
+    if (debug_ & 0x1) { std::cerr << "call delete_fluid_synth\n"; }
     delete_fluid_synth(synth_);
     synth_ = nullptr;
   }
   if (settings_) {
+    if (debug_ & 0x1) { std::cerr << "call delete_fluid_settings\n"; }
     delete_fluid_settings(settings_);
     settings_ = nullptr;
   }
