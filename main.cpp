@@ -6,12 +6,15 @@
 #include "options.h"
 #include "play.h"
 #include "synthseq.h"
+#include "version.h"
 
 int main(int argc, char **argv) {
   int rc = 0;
   Options options(argc, argv);
   if (options.Help()) {
     std::cout << options.Description();
+  } else if (options.Version()) {
+    std::cout << version << '\n';
   } else if (!options.Valid()) {
     std::cerr << options.Description();
     rc = 1;

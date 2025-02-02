@@ -5,6 +5,7 @@
 #include <sstream>
 #include <fmt/core.h>
 #include <boost/program_options.hpp>
+#include "version.h"
 
 static uint32_t MINUTE_MILLIES = 60000;
 static uint32_t INFINITE_MINUTES_MILLIES = MINUTE_MILLIES *
@@ -146,7 +147,11 @@ std::ostream& operator<<(std::ostream& os, const U8ToRange& u2r) {
 class _OptionsImpl {
  public:
   using k2range_t = Options::k2range_t;
-  _OptionsImpl(int argc, char **argv) {
+  _OptionsImpl(int argc, char **argv) :
+    desc_{fmt::format(
+      "modimidi {} - Play midi file with optional modifications",
+      version).c_str()}
+    {
     AddOptions();
     // last argument - the midi file
     pos_desc_.add("midifile", -1);
@@ -158,6 +163,7 @@ class _OptionsImpl {
     po::notify(vm_);
   }
   bool Help() const { return vm_.count("help"); }
+  bool Version() const { return vm_["version"].as<bool>(); }
   std::string Description() const {
     std::ostringstream oss;
     oss << desc_;
@@ -264,6 +270,8 @@ class _OptionsImpl {
 void _OptionsImpl::AddOptions() {
   desc_.add_options()
     ("help,h", "produce help message")
+    ("version", po::bool_switch()->default_value(false),
+       "print version and exit")
     ("midifile", po::value<std::string>(),
        "Positional argument. Path of the midi file to be played")
     ("begin,b", 
@@ -328,6 +336,10 @@ bool Options::Valid() const {
 
 bool Options::Help() const {
   return p_->Help();
+}
+
+bool Options::Version() const {
+  return p_->Version();
 }
 
 bool Options::Info() const {

@@ -17,6 +17,7 @@ class Options {
   std::string Description() const;
   bool Valid() const;
   bool Help() const;
+  bool Version() const;
   bool Info() const;
   std::string DumpPath() const;
   bool Play() const;

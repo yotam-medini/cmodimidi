@@ -1,6 +1,22 @@
 cmake_minimum_required(VERSION 3.10)
 project(modimidi)
 
+set(GENERATE_VERSION_SCRIPT "${CMAKE_SOURCE_DIR}/tools/genver.py")
+set(VERSION_CPP "${CMAKE_SOURCE_DIR}/version.cpp")
+
+# Add a custom command to generate VERSION.h
+add_custom_command(
+    OUTPUT ${VERSION_CPP} 
+    COMMAND ${GENERATE_VERSION_SCRIPT} README.md version.cpp
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    DEPENDS ${GENERATE_VERSION_SCRIPT} README.md ${CMAKE_LISTS_FILE} 
+    COMMENT "Generating version.cpp" 
+)
+
+# Add a custom target for the generated file
+add_custom_target(generate_version ALL
+  DEPENDS ${VERSION_CPP} version.h tools/genver.py CMakeLists.txt)
+
 # Find the Boost libraries
 find_package(Boost COMPONENTS program_options REQUIRED)
 
@@ -30,10 +46,14 @@ set(SOURCE_FILES
     play.cpp
     synthseq.cpp
     util.cpp
+    version.cpp
 )
 
 # Add the executable target
 add_executable(modimidi ${SOURCE_FILES})
+
+# Make the executable depend on the generated header
+add_dependencies(modimidi generate_version)
 
 # Link with the required libraries
 # ${FMT_LIBRARIES}
