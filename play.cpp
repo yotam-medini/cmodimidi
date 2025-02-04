@@ -227,6 +227,7 @@ class Player {
   void SetIndexEvents();
   uint32_t GetFirstNoteTime();
   void SetAbsEvents();
+  bool RetuneNeeded() const { return (pp_.tuning_ != 440); }
   void Retune();
   void play();
   void SetVelocitiesMap();
@@ -291,7 +292,7 @@ int Player::run() {
   SetIndexEvents();
   if (pp_.debug_ & 0x1) { std::cerr << "Player::run() end\n"; }
   SetAbsEvents();
-  if (pp_.tuning_ != 440) {
+  if (RetuneNeeded()) {
     Retune();
   }
   play();
@@ -375,10 +376,14 @@ void Player::SetAbsEvents() {
 }
 
 void Player::Retune() {
-  const std::vector<uint8_t> programs = pm_.GetPrograms();
+  std::vector<uint8_t> programs = pm_.GetPrograms();
+  if (programs.empty()) {
+    programs.push_back(0);
+  }
+  std::vector<uint8_t> channels = pm_.GetChannels();
   if (pp_.debug_ & 0x1) {
-    std::cout << fmt::format("Retune {} programs to A4={}\n",
-      programs.size(), pp_.tuning_);
+    std::cout << fmt::format("Retune {} programs on {} channels to A4={}\n",
+      programs.size(), channels.size(), pp_.tuning_);
   }
   int bank = 0;
   int keys[0x80];
@@ -413,19 +418,22 @@ void Player::Retune() {
     pitches[i] = pitches[i - 1] + 100.;
   }
   for (size_t i = Akey, im1 = i - 1; i > 0; i = im1--) {
-    pitches[i] = pitches[i + 1] - 100.;
+    pitches[i] = std::max(100., pitches[i + 1] - 100.);
   }
   for (size_t pi = 0; (rc_ == 0) && (pi < programs.size()); ++pi) {
-    uint8_t prog = std::max(100., pitches[pi]);
+    uint8_t prog = programs[pi];
     rc_ = fluid_synth_tune_notes(
       ss_.synth_, bank, prog, 0x80, keys, pitches, 1);
     if (rc_ != FLUID_OK) {
       std::cerr << fmt::format("fluid_synth_tune_notes failed {}\n", rc_);
     } else {
-      rc_ = fluid_synth_activate_tuning(ss_.synth_, 0, bank, prog, 1);
-      if (rc_ != FLUID_OK) {
-        std::cerr << fmt::format(
-          "fluid_synth_activate_tuning failed {}\n", rc_);
+      for (size_t ci = 0; (rc_ == 0) && (ci < channels.size()); ++ci) {
+        uint8_t channel = channels[ci];
+        rc_ = fluid_synth_activate_tuning(ss_.synth_, channel, bank, prog, 1);
+        if (rc_ != FLUID_OK) {
+          std::cerr << fmt::format(
+            "fluid_synth_activate_tuning failed {}\n", rc_);
+        }
       }
     }
   }
