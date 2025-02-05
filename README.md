@@ -74,29 +74,29 @@ which is provided by the ``fluid-soundfont-gm`` package.
 
 ## Command Line Options
 
- Option                        | &nbsp;&nbsp;&nbsp; | [<font color="green">Default</font>] Description
- -------------                 | -------            |:-------------
- ``-h``,``--help``             |                    | produce help message
- ``--version``                 |                    | print version and exit
- ``--midifile`` *filename*     |                    | Path of the midi file to be played.
-                               |                    | Can also be the last argument.
-  ``-b``,``--begin`` *time*    |                    | [<font color="green">0</font>] start *time*
-  ``-e``,``--end``   *time*    |                    |  [<font color="green">$\infty$</font>] end *time*
-  ``--delay`` *time*           |                    | [<font color="green">0.200</font>] Initial extra playing delay
-  ``--batch-duration`` *time*  |                    | [<font color="green">10</font>] sequencer batch duration
-    &nbsp;                     |     &nbsp;         | Determines the amount of events sent to the fluidsynth engine
-  ``-T``,``--tempo`` *factor*  |                    | [<font color="green">1.0</font>] Speed Multiplier factor, the greater the faster
-  ``-K``,``--adjust-key`` *n*  |                    | [<font color="green">0</font>] Tranpose by $n$ semitone
-  ``--tuning`` *frequency*     |                    | [<font color="green">415</font>] Tuning *frequency* of A4 (central La)
-  ``tmap`` *arg*               |                    | (Repeatable) Tracks velocity mappings <*track*>:<*low*>[,<*high*>]
-  ``cmap`` *arg*               |                    | (Repeatable) Channel velocity mappings <*track*>:<*low*>[,<*high*>]
-  ``s``,``--soundfont`` *path* |                    | [<font color="green">/usr/share/sounds/sf2/FluidR3_GM.sf2</font>] 
-               &nbsp;          |    &nbsp;          | Path to sound font
-  ``--info``                   |                    | print general information of the midi file
-  ``--dump`` *path*            |                    | Dump midi events contents to file, '-' for ``stdout``
-  ``--noplay``                 |                    | Do not play, usefull with ``--info`` or ``--dump``
-  ``--progress``               |                    | Show progress
-  ``--debug`` $bitsflags$      |                    | [<font color="green">0</font>] Debug flags
+|  Option                        | &nbsp;&nbsp;&nbsp; | [<font color="green">Default</font>] Description |
+|  -------------                 | -------            |:------------- |
+|  ``-h``,``--help``             |                    | produce help message |
+|  ``--version``                 |                    | print version and exit |
+|  ``--midifile`` *filename*     |                    | Path of the midi file to be played. |
+|                                |                    | Can also be the last argument. |
+|   ``-b``,``--begin`` *time*    |                    | [<font color="green">0</font>] start *time* |
+|   ``-e``,``--end``   *time*    |                    |  [<font color="green">$\infty$</font>] end *time* |
+|   ``--delay`` *time*           |                    | [<font color="green">0.200</font>] Initial extra playing delay |
+|   ``--batch-duration`` *time*  |                    | [<font color="green">10</font>] sequencer batch duration |
+|     &nbsp;                     |     &nbsp;         | Determines the amount of events sent to the fluidsynth engine |
+|   ``-T``,``--tempo`` *factor*  |                    | [<font color="green">1.0</font>] Speed Multiplier factor, the greater the faster |
+|   ``-K``,``--adjust-key`` *n*  |                    | [<font color="green">0</font>] Tranpose by $n$ semitone |
+|   ``--tuning`` *frequency*     |                    | [<font color="green">415</font>] Tuning *frequency* of A4 (central La) |
+|   ``tmap`` *arg*               |                    | (Repeatable) Tracks velocity mappings <*track*>:<*low*>[,<*high*>] |
+|   ``cmap`` *arg*               |                    | (Repeatable) Channel velocity mappings <*track*>:<*low*>[,<*high*>] |
+|   ``s``,``--soundfont`` *path* |                    | [<font color="green">/usr/share/sounds/sf2/FluidR3_GM.sf2</font>]  |
+|                &nbsp;          |    &nbsp;          | Path to sound font |
+|   ``--info``                   |                    | print general information of the midi file |
+|   ``--dump`` *path*            |                    | Dump midi events contents to file, '-' for ``stdout`` |
+|   ``--noplay``                 |                    | Do not play, usefull with ``--info`` or ``--dump`` |
+|   ``--progress``               |                    | Show progress |
+|   ``--debug`` $bitsflags$      |                    | [<font color="green">0</font>] Debug flags |
 
 # Notes
 * The *time* value format is [*minutes*]:*seconds*[.*millisecs*]
