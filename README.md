@@ -74,14 +74,14 @@ which is provided by the ``fluid-soundfont-gm`` package.
 
 ## Command Line Options
 
-|  Option                        | &nbsp;&nbsp;&nbsp; | [<span style="color:green">Default</span>] Description |
+|  Option                        | &nbsp;&nbsp;&nbsp; | [Default] Description |
 |  -------------                 | -------            |:------------- |
 |  ``-h``,``--help``             |                    | produce help message |
 |  ``--version``                 |                    | print version and exit |
 |  ``--midifile`` *filename*     |                    | Path of the midi file to be played. |
 |                                |                    | Can also be the last argument. |
 |   ``-b``,``--begin`` *time*    |                    | [<font color="green">0</font>] start *time* |
-|   ``-e``,``--end``   *time*    |                    |  [<font color="green">&infin;\infty$</font>] end *time* |
+|   ``-e``,``--end``   *time*    |                    | [<font color="green">&infin;</font>] end *time* |
 |   ``--delay`` *time*           |                    | [<font color="green">0.200</font>] Initial extra playing delay |
 |   ``--batch-duration`` *time*  |                    | [<font color="green">10</font>] sequencer batch duration |
 |     &nbsp;                     |     &nbsp;         | Determines the amount of events sent to the fluidsynth engine |
