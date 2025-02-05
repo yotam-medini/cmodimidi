@@ -79,7 +79,7 @@ which is provided by the ``fluid-soundfont-gm`` package.
  ``-h``,``--help``             |                    | produce help message
  ``--version``                 |                    | print version and exit
  ``--midifile`` *filename*     |                    | Path of the midi file to be played.
-         &nbsp;                |     &nbsp;         | Can also be the last argument.
+                               |                    | Can also be the last argument.
   ``-b``,``--begin`` *time*    |                    | [<font color="green">0</font>] start *time*
   ``-e``,``--end``   *time*    |                    |  [<font color="green">$\infty$</font>] end *time*
   ``--delay`` *time*           |                    | [<font color="green">0.200</font>] Initial extra playing delay
