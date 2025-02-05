@@ -1,8 +1,3 @@
----
-header-includes:
-  - \usepackage{hyperref}
-  - \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
----
 # modimidi
 Command line midi player using
 [fluidsynth](https://www.fluidsynth.org/api/index.html) implented in C++
