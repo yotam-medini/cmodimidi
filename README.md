@@ -74,7 +74,7 @@ which is provided by the ``fluid-soundfont-gm`` package.
 
 ## Command Line Options
 
-|  Option                        | &nbsp;&nbsp;&nbsp; | [<font color="green">Default</font>] Description |
+|  Option                        | &nbsp;&nbsp;&nbsp; | [<text style="color: green">Default</text>] Description |
 |  -------------                 | -------            |:------------- |
 |  ``-h``,``--help``             |                    | produce help message |
 |  ``--version``                 |                    | print version and exit |
