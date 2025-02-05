@@ -93,6 +93,6 @@ which is provided by the ``fluid-soundfont-gm`` package.
 |   ``--progress``               |                    | Show progress |
 |   ``--debug`` $bitsflags$      |                    | [<font color="green">0</font>] Debug flags |
 
-# Notes
+### Notes
 * The *time* value format is [*minutes*]:*seconds*[.*millisecs*]
 * Both ``--tmap`` and ``--cmap`` can be given. If both applied to an event, then ``--cmap`` takes precedence.
