@@ -1,9 +1,9 @@
 # modimidi
 Command line midi player using
-[fluidsynth](https://www.fluidsynth.org/api/index.html) implented in C++
+[fluidsynth](https://www.fluidsynth.org/api/index.html) implemented in C++
 
 ## Version
-The current version is 0.1.1
+The current version is 0.1.2
 
 # Example
 
