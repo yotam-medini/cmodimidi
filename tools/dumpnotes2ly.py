@@ -149,14 +149,38 @@ class Dump2Ly:
                     duration = note_off.abs_time - note_on.abs_time
                     note = Note(note_on.abs_time, note_on.key, duration)
                     if len(track.notes) < 3:
-                        ew(f"note={note}\n")
+                        ew(f"note={note}, T(key)={type(note.key)}\n")
                     track.notes.append(note)
                     notes_on_l.pop()
         ew(f"#(time_signatures)={len(self.time_signatures)}\n")
         
-    def write_notes(self, ofn):
+    def write_notes(self, fout):
         for ti, track in enumerate(self.tracks):
             ew(f"Track[{ti}] {track.name} #(notes)={len(track.notes)}\n")
+
+        syms = (
+            ["c", "df", "d", "ef", "e", "f", "gf", "g", "af", "a", "bf", "b"]
+            if self.pa.flat else
+            ["c", "cs", "d", "ds", "e", "f", "fs", "g", "gs", "a", "as", "b"]
+        )
+            
+        for ti, track in enumerate(self.tracks):
+            pre_key = 60
+            fout.write(f"\ntrack{ti}{track.name} = ")
+            fout.write("{\n")
+            for ni, note in enumerate(track.notes):
+                if ni % 8 == 0:
+                    fout.write("\n  ")
+                key = note.key
+                ksym = syms[key % 12]
+                jump = ""
+                if key - pre_key > 6:
+                    jump = "'"
+                elif key - pre_key < -6:
+                    jump = ","
+                fout.write(f" {ksym}{jump}")
+                pre_key = key
+            fout.write("\n}\n")
    
 def parse_args(args: [str]):
     parser = argparse.ArgumentParser(
