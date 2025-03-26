@@ -29,21 +29,25 @@ class TimeSignature:
             f", cc={self.cc}, bb={self.bb}, dur={self.duration()}")
 
 class NoteOn:
-    def __init__(self, at=0, key=0, value=0):
+    def __init__(self, at=0, channel=0, key=0, value=0):
         self.abs_time = at
+        self.channel = channel
         self.key = key
         self.value = value
 
     def __str__(self) -> str:
-        return f"NoteOn(at={self.abs_time}, key={self.key}, v={self.value})"
+        return (f"NoteOn(at={self.abs_time}, c={self.channel}, "
+                f"key={self.key}, v={self.value})")
         
 class NoteOff:
-    def __init__(self, at=0, key=0):
+    def __init__(self, at=0, channel=0, key=0):
         self.abs_time = at
+        self.channel = channel
         self.key = key
 
     def __str__(self) -> str:
-        return f"NoteOff(at={self.abs_time}, key={self.key})"
+        return (f"NoteOff(at={self.abs_time}, channel={self.channel}, "
+                f"key={self.key})")
         
 class Note:
     def __init__(self, at=0, key=0, duration=0):
@@ -113,11 +117,11 @@ class Dump2Ly:
                     nums = list(map(int, m.groups()))
                     velocity = nums[3]
                     if velocity > 0:
-                        note_on = NoteOn(nums[0], nums[2], velocity)
+                        note_on = NoteOn(nums[0], nums[1], nums[2], velocity)
                         if ln < 75:
                             ew(f"note_on={note_on}\n")
                     else:
-                        note_off = Note_off(nums[0], nums[2])
+                        note_off = Note_off(nums[0], nums[1], nums[2])
             elif "NoteOff(" in line:
                 m = re.match(re_noteoff, line)
                 if m is None:
@@ -125,7 +129,7 @@ class Dump2Ly:
                     sys.exit(13)
                 else:
                     nums = list(map(int, m.groups()))
-                    note_off = NoteOff(nums[0], nums[2])
+                    note_off = NoteOff(nums[0], nums[1], nums[2])
                     if ln < 75:
                         ew(f"note_off={note_off}\n")
             if ((note_off is not None) and (note_on is not None) and
