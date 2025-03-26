@@ -22,8 +22,11 @@ void midi_dump(const midi::Midi &parsed_midi, std::string &path) {
     const std::vector<std::unique_ptr<midi::Event>> &events = track.events_;
     const size_t ne = events.size();
     out << fmt::format("Track[{:2d}] #(events)={}", itrack, ne) << " {\n";
+    uint32_t abs_time = 0;
     for (size_t ie = 0; ie < ne; ++ie) {
-      out << fmt::format(" [{:4d}] {}\n", ie, events[ie]->str());
+      const midi::Event *e = events[ie].get();
+      abs_time += e->delta_time_;
+      out << fmt::format(" [{:4d}] AT={}, {}\n", ie, abs_time, e->dt_str());
     } 
     out << "}\n";
   }
