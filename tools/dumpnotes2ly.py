@@ -90,7 +90,8 @@ class Dump2Ly:
         re_noteon = (r".*AT=(\d+).*NoteOn."
                      "channel=(\d+), key=(\d+), velocity=(\d+)")
         re_noteoff = r".*AT=(\d+).*NoteOff.channel=(\d+), key=(\d+).*"
-        note_on = None
+        re_trackname = r".*SequenceTrackName.([A-Za-z0-9]*).*"
+        note_ons = {}
         for line in fin.readlines():
             ln += 1
             note_off = None
@@ -98,8 +99,14 @@ class Dump2Ly:
                 i_track += 1
                 track = Track()
                 self.tracks.append(track)
-                note_on = None
-            if "TimeSignature" in line:
+                note_ons = {}
+            if "SequenceTrackName" in line:
+                m = re.match(re_trackname, line)
+                if m is None:
+                    ew(f"Failed to parse [{ln}] {line}\n")
+                else:
+                    track.name = m.groups()[0]
+            elif "TimeSignature" in line:
                 m = re.match(re_ts, line)
                 if m is None:
                     ew(f"Failed to parse [{ln}] {line}\n")
@@ -120,6 +127,7 @@ class Dump2Ly:
                         note_on = NoteOn(nums[0], nums[1], nums[2], velocity)
                         if ln < 75:
                             ew(f"note_on={note_on}\n")
+                        note_ons.setdefault(note_on.key, []).append(note_on)
                     else:
                         note_off = Note_off(nums[0], nums[1], nums[2])
             elif "NoteOff(" in line:
@@ -132,18 +140,23 @@ class Dump2Ly:
                     note_off = NoteOff(nums[0], nums[1], nums[2])
                     if ln < 75:
                         ew(f"note_off={note_off}\n")
-            if ((note_off is not None) and (note_on is not None) and
-                (note_off.key == note_on.key)):
-                duration = note_off.abs_time - note_on.abs_time
-                note = Note(note_on.abs_time, note_on.key, duration)
-                if ln < 75:
-                    ew(f"note={note}\n")
-                track.notes.append(note)
+            if note_off is not None:
+                notes_on_l = note_ons.setdefault(note_off.key, [])
+                if len(notes_on_l) == 0:
+                    ew(f"Unmatched {note_off} @ ln={ln}\n")
+                else:
+                    note_on = notes_on_l[-1]
+                    duration = note_off.abs_time - note_on.abs_time
+                    note = Note(note_on.abs_time, note_on.key, duration)
+                    if len(track.notes) < 3:
+                        ew(f"note={note}\n")
+                    track.notes.append(note)
+                    notes_on_l.pop()
         ew(f"#(time_signatures)={len(self.time_signatures)}\n")
         
     def write_notes(self, ofn):
         for ti, track in enumerate(self.tracks):
-            ew(f"Track[{ti}] #(notes)={len(track.notes)}\n")
+            ew(f"Track[{ti}] {track.name} #(notes)={len(track.notes)}\n")
    
 def parse_args(args: [str]):
     parser = argparse.ArgumentParser(
