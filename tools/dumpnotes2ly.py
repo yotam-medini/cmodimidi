@@ -61,6 +61,9 @@ class Note:
         self.key = key
         self.duration = duration
 
+    def end_time(self):
+        return self.abs_time + self.duration
+    
     def __str__(self) -> str:
         return f"Note(at={self.abs_time}, key={self.key}, dur={self.duration})"
         
@@ -188,8 +191,10 @@ class Dump2Ly:
             curr_bar = 0
             last_bar = 0
             curr_at = 0
+            last_dur = ""
             tss = self.time_signatures # abbreviate
-            for ni, note in enumerate(track.notes):
+            gnotes = self.fill_rests(track.notes)
+            for ni, note in enumerate(gnotes):
                 while (curr_ts_idx + 1 < len(tss) and
                        (tss[curr_ts_idx + 1].abs_time < note.abs_time)):
                     pre_ts = curr_ts
@@ -212,15 +217,61 @@ class Dump2Ly:
                     pts = str(curr_ts) if self.pa.debug & 0x1 else ""
                     fout.write(f"\n  % | bar {curr_bar} {pts}\n")
                 key = note.key
-                ksym = syms[key % 12]
+                ksym = "r"
                 jump = ""
-                if key - pre_key > 6:
-                    jump = "'"
-                elif key - pre_key < -6:
-                    jump = ","
-                fout.write(f" {ksym}{jump}")
+                if key >= 0:
+                    ksym = syms[key % 12]
+                    jump = ""
+                    if key - pre_key > 6:
+                        jump = "'"
+                    elif key - pre_key < -6:
+                        jump = ","
+                    dur = self.midi_dur_to_ly_dur(note.duration)
+                    new_dur = ""
+                if last_dur != dur:
+                    last_dur = dur
+                    new_dur = dur
+                fout.write(f" {ksym}{jump}{new_dur}")
                 pre_key = key
             fout.write("\n}\n")
+
+    def fill_rests(self, notes):
+        gnotes = []
+        curr_time = 0
+        for note in notes:
+            delta = note.abs_time - curr_time
+            if delta > self.ticks_per_quarter/4:
+                gnotes.append(Note(curr_time, -1, delta)) # rest
+            curr_time = note.end_time()
+            gnotes.append(note)
+        return gnotes
+
+    def midi_dur_to_ly_dur(self, midi_dur) -> str:
+        tpq = self.ticks_per_quarter
+        whole = 4*tpq
+        grace = 11./12.
+        ret = ""
+        if midi_dur > grace * whole:
+            ret = "1"
+        elif midi_dur > grace * (3./4.) * whole:
+            ret = "2."
+        elif midi_dur > grace * (1./2.) * whole:
+            ret = "2"
+        elif midi_dur > grace * (3./8.) * whole:
+            ret = "4."
+        elif midi_dur > grace * (1./4.) * whole:
+            ret = "4"
+        elif midi_dur > grace * (3./16.) * whole:
+            ret = "8."
+        elif midi_dur > grace * (1./8.) * whole:
+            ret = "8"
+        elif midi_dur > grace * (3./32.) * whole:
+            ret = "16."
+        elif midi_dur > grace * (1./16.) * whole:
+            ret = "16"
+        elif midi_dur > grace * (1./32.) * whole:
+            ret = "32"
+        return ret
    
 def parse_args(args: [str]):
     parser = argparse.ArgumentParser(
@@ -245,7 +296,7 @@ def parse_args(args: [str]):
         default=0,
         help="Debug flags")
     return parser.parse_args(args)
-    
+
 def main(args: [str]) -> int:
     parsed_args = parse_args(args)
     ow(f"{pprint.pformat(parsed_args)}\n")
