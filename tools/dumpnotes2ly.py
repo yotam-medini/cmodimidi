@@ -29,6 +29,8 @@ class TimeSignature:
             self.duration_ = self.quarters()
         return self.duration_
 
+    def stime(self) -> str:
+        return f"{self.nn}/{2**self.dd}"
     def __str__(self) -> str:
         return (
             f"TimeSignature(at={self.abs_time}, nn={self.nn}, dd={self.dd}"
@@ -186,36 +188,44 @@ class Dump2Ly:
             curr_ts_idx = -1
             pre_key = 60
             fout.write(f"\ntrack{ti}{track.name} = ")
-            fout.write("{\n")
+            fout.write("{\n ")
             curr_ts_bar = 0
             curr_bar = 0
             last_bar = 0
             curr_at = 0
-            last_dur = ""
+            last_dur = dur = ""
             tss = self.time_signatures # abbreviate
             gnotes = self.fill_rests(track.notes)
             for ni, note in enumerate(gnotes):
+                debug_bar = (ti == 1) and (ni < 20)
                 while (curr_ts_idx + 1 < len(tss) and
                        (tss[curr_ts_idx + 1].abs_time < note.abs_time)):
                     pre_ts = curr_ts
                     curr_ts_idx += 1
                     curr_ts = tss[curr_ts_idx];
+                    fout.write(f"\n  \\time {curr_ts.stime()}\n ")
                     dt = curr_ts.abs_time - curr_at
+                    if debug_bar:
+                        ew(f"ts: idx={curr_ts_idx} curr_at={curr_at} "
+                           f" at={curr_ts.abs_time} dt={dt}\n")
                     n_quarters = pre_ts.quarters()
                     bars = dt / (n_quarters * self.ticks_per_quarter)
                     curr_bar += int(bars + 1./2.)
                     curr_at = curr_ts.abs_time
                     curr_ts_bar = curr_bar
-                if False and (ni % 8) == 0:
-                    fout.write("\n  ")
                 dt = note.abs_time - curr_ts.abs_time
                 n_quarters = curr_ts.quarters()
-                n_bars = int((dt/(n_quarters * self.ticks_per_quarter)) + 1./2.)
+                bars = dt/(n_quarters * self.ticks_per_quarter)
+                if debug_bar:
+                    ksym = syms[note.key % 12] if note.key >= 0 else "r"
+                    ew(f"ni={ni}, k={ksym} dt={dt}, bars={bars}, "
+                       f"n_quarters={n_quarters} tpq={self.ticks_per_quarter}\n")
+                n_bars = int(bars)
                 curr_bar = curr_ts_bar + n_bars
                 if last_bar != curr_bar:
                     last_bar = curr_bar
                     pts = str(curr_ts) if self.pa.debug & 0x1 else ""
-                    fout.write(f"\n  % | bar {curr_bar} {pts}\n")
+                    fout.write(f"\n  % | % bar {curr_bar + 1} {pts}\n ")
                 key = note.key
                 ksym = "r"
                 jump = ""
@@ -226,8 +236,8 @@ class Dump2Ly:
                         jump = "'"
                     elif key - pre_key < -6:
                         jump = ","
-                    dur = self.midi_dur_to_ly_dur(note.duration)
-                    new_dur = ""
+                dur = self.midi_dur_to_ly_dur(note.duration)
+                new_dur = ""
                 if last_dur != dur:
                     last_dur = dur
                     new_dur = dur
@@ -241,7 +251,7 @@ class Dump2Ly:
         for note in notes:
             delta = note.abs_time - curr_time
             if delta > self.ticks_per_quarter/4:
-                gnotes.append(Note(curr_time, -1, delta)) # rest
+                gnotes.append(Note(curr_time + self.pa.rest_shift, -1, delta)) # rest
             curr_time = note.end_time()
             gnotes.append(note)
         return gnotes
@@ -290,6 +300,11 @@ def parse_args(args: [str]):
         action="store_true",
         default=False,
         help="Use flats rather than defualt sharp")
+    parser.add_argument(
+        "--rest-shift",
+        type=int,
+        default=20,
+        help="ticks shift of rests")
     parser.add_argument(
         "--debug",
         type=int,
