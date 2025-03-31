@@ -197,7 +197,6 @@ class Dump2Ly:
             tss = self.time_signatures # abbreviate
             gnotes = self.fill_rests(track.notes)
             for ni, note in enumerate(gnotes):
-                debug_bar = (ti == 1) and (ni < 20)
                 while (curr_ts_idx + 1 < len(tss) and
                        (tss[curr_ts_idx + 1].abs_time < note.abs_time)):
                     pre_ts = curr_ts
@@ -205,9 +204,6 @@ class Dump2Ly:
                     curr_ts = tss[curr_ts_idx];
                     fout.write(f"\n  \\time {curr_ts.stime()}\n ")
                     dt = curr_ts.abs_time - curr_at
-                    if debug_bar:
-                        ew(f"ts: idx={curr_ts_idx} curr_at={curr_at} "
-                           f" at={curr_ts.abs_time} dt={dt}\n")
                     n_quarters = pre_ts.quarters()
                     bars = dt / (n_quarters * self.ticks_per_quarter)
                     curr_bar += int(bars + 1./2.)
@@ -216,10 +212,6 @@ class Dump2Ly:
                 dt = note.abs_time - curr_ts.abs_time
                 n_quarters = curr_ts.quarters()
                 bars = dt/(n_quarters * self.ticks_per_quarter)
-                if debug_bar:
-                    ksym = syms[note.key % 12] if note.key >= 0 else "r"
-                    ew(f"ni={ni}, k={ksym} dt={dt}, bars={bars}, "
-                       f"n_quarters={n_quarters} tpq={self.ticks_per_quarter}\n")
                 n_bars = int(bars)
                 curr_bar = curr_ts_bar + n_bars
                 if last_bar != curr_bar:
