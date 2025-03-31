@@ -144,8 +144,6 @@ class Dump2Ly:
                     velocity = nums[3]
                     if velocity > 0:
                         note_on = NoteOn(nums[0], nums[1], nums[2], velocity)
-                        if ln < 75:
-                            ew(f"  note_on={note_on}\n")
                         note_ons.setdefault(note_on.key, []).append(note_on)
                     else:
                         note_off = Note_off(nums[0], nums[1], nums[2])
@@ -157,8 +155,6 @@ class Dump2Ly:
                 else:
                     nums = list(map(int, m.groups()))
                     note_off = NoteOff(nums[0], nums[1], nums[2])
-                    if ln < 75:
-                        ew(f"  note_off={note_off}\n")
             if note_off is not None:
                 notes_on_l = note_ons.setdefault(note_off.key, [])
                 if len(notes_on_l) == 0:
@@ -167,8 +163,6 @@ class Dump2Ly:
                     note_on = notes_on_l[-1]
                     duration = note_off.abs_time - note_on.abs_time
                     note = Note(note_on.abs_time, note_on.key, duration)
-                    if len(track.notes) < 3:
-                        ew(f"note={note}, T(key)={type(note.key)}\n")
                     track.notes.append(note)
                     notes_on_l.pop()
         ew(f"#(time_signatures)={len(self.time_signatures)}\n")
@@ -209,6 +203,8 @@ class Dump2Ly:
                     curr_bar += int(bars + 1./2.)
                     curr_at = curr_ts.abs_time
                     curr_ts_bar = curr_bar
+                if ni > 0 and note.abs_time <= gnotes[ni - 1].abs_time:
+                    fout.write("\n ") # multi voice
                 dt = note.abs_time - curr_ts.abs_time
                 n_quarters = curr_ts.quarters()
                 bars = dt/(n_quarters * self.ticks_per_quarter)
