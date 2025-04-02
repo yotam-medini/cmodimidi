@@ -224,13 +224,13 @@ class Dump2Ly:
                         jump = "'"
                     elif key - pre_key < -6:
                         jump = ","
+                    pre_key = key
                 dur = self.midi_dur_to_ly_dur(note.duration)
                 new_dur = ""
                 if last_dur != dur:
                     last_dur = dur
                     new_dur = dur
                 fout.write(f" {ksym}{jump}{new_dur}")
-                pre_key = key
             fout.write("\n}\n")
 
     def fill_rests(self, notes):
