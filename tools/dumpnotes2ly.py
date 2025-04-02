@@ -192,7 +192,7 @@ class Dump2Ly:
             gnotes = self.fill_rests(track.notes)
             for ni, note in enumerate(gnotes):
                 while (curr_ts_idx + 1 < len(tss) and
-                       (tss[curr_ts_idx + 1].abs_time < note.abs_time)):
+                       (tss[curr_ts_idx + 1].abs_time <= note.abs_time)):
                     pre_ts = curr_ts
                     curr_ts_idx += 1
                     curr_ts = tss[curr_ts_idx];
