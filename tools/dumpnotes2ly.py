@@ -176,6 +176,11 @@ class Dump2Ly:
             if self.pa.flat else
             ["c", "cs", "d", "ds", "e", "f", "fs", "g", "gs", "a", "as", "b"]
         )
+        syms_index = (
+            [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6]
+            if self.pa.flat else
+            [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6]
+        )
 
         for ti, track in enumerate(self.tracks):
             curr_ts = TimeSignature(nn=4, dd=2, cc=24, bb=8)
@@ -220,10 +225,17 @@ class Dump2Ly:
                 if key >= 0:
                     ksym = syms[key % 12]
                     jump = ""
-                    if key - pre_key > 6:
-                        jump = "'"
-                    elif key - pre_key < -6:
-                        jump = ","
+                    sym_idx = syms_index[key % 12]
+                    psym_idx = syms_index[pre_key % 12]
+                    if pre_key < key:
+                        if (sym_idx + 7 - psym_idx) % 7 > 3:
+                            jump = "'"
+                    elif pre_key > key:
+                        if (psym_idx + 7 - sym_idx) % 7 > 3:
+                            jump = ","
+                    # if ti==1 and jump != "":
+                    #     ew(f"jump={jump} pre_key={pre_key}[{psym_idx}]"
+                    #        f" key={key}[{sym_idx}]\n")
                     pre_key = key
                 dur = self.midi_dur_to_ly_dur(note.duration)
                 new_dur = ""
