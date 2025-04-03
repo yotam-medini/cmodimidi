@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(modimidi)
 
+# set(CMAKE_CXX_STANDARD 20)
 set(GENERATE_VERSION_SCRIPT "${CMAKE_SOURCE_DIR}/tools/genver.py")
 set(VERSION_CPP "${CMAKE_SOURCE_DIR}/version.cpp")
 
