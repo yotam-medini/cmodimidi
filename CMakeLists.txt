@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(modimidi)
 
+# set(CMAKE_CXX_STANDARD 20)
 set(GENERATE_VERSION_SCRIPT "${CMAKE_SOURCE_DIR}/tools/genver.py")
 set(VERSION_CPP "${CMAKE_SOURCE_DIR}/version.cpp")
 
@@ -59,6 +60,16 @@ add_dependencies(modimidi generate_version)
 # ${FMT_LIBRARIES}
 target_link_libraries(modimidi 
     ${FLUIDSYNTH_LIBRARY} 
+    ${Boost_LIBRARIES}
+    fmt::fmt-header-only
+)
+
+# modidump2ly
+add_executable(modidump2ly
+    tools/modidump2ly.cpp
+)
+
+target_link_libraries(modidump2ly
     ${Boost_LIBRARIES}
     fmt::fmt-header-only
 )
