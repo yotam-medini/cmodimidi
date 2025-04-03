@@ -66,5 +66,9 @@ target_link_libraries(modimidi
 # modidump2ly
 add_executable(modidump2ly
     tools/modidump2ly.cpp
-    # ... other tool-specific sources and headers
+)
+
+target_link_libraries(modidump2ly
+    ${Boost_LIBRARIES}
+    fmt::fmt-header-only
 )
