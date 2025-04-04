@@ -194,8 +194,8 @@ int ModiDump2Ly::Parse() {
       getting_tracks = GetTrack(ifs);
     }
     if (Debug() & 0x2) {
-      std::cout << "#(TimeSignature)={}\n", time_sigs_.size();
-      std::cout << "#(tracks)={}: [\n", tracks_.size();
+      std::cout << fmt::format("#(TimeSignature)={}\n", time_sigs_.size());
+      std::cout << fmt::format("#(tracks)={}: [\n", tracks_.size());
       for (size_t i = 0; i < tracks_.size(); ++i) {
         const Track &track = tracks_[i];
         std::cout << fmt::format("  [{}] name={}, #(notes)={}\n",
@@ -203,6 +203,7 @@ int ModiDump2Ly::Parse() {
       }
       std::cout << "]\n";
     }
+    ifs.close();
   }
   if (Debug() & 0x1) { std::cerr << "} end of Parse\n"; }
   return RC();
