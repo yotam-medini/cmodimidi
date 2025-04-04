@@ -9,6 +9,15 @@
 
 namespace po = boost::program_options;
 
+static const std::regex time_seg_regex(
+  "^.*AT=(\\d++),.* "
+  "TimeSignature\\(nn=(\\d+), dd=(\\d+), cc=(\\d+), bb=(\\d+)\\).*");
+static const std::regex note_on_off_regex(
+  "^.*AT=(\\d++),.* "
+  "Note([Ofn]+)\\(channel=(\\d+), key=(\\d+), velocity=(\\d+)\\).*");
+static const std::regex track_name_regex(
+  "^.*AT=.* SequenceTrackName\\((\\w+)\\).*");
+
 class TimeSignature {
  public:
   TimeSignature(
@@ -17,6 +26,14 @@ class TimeSignature {
     uint8_t dd=0,
     uint8_t cc=0,
     uint8_t bb=0) : abs_time_{at}, nn_{nn}, dd_{dd}, cc_{cc}, bb_{bb} {
+  }
+  TimeSignature(const std::smatch &base_match) :
+    TimeSignature(
+     std::stoi(base_match[1].str()),
+     std::stoi(base_match[2].str()),
+     std::stoi(base_match[3].str()),
+     std::stoi(base_match[4].str()),
+     std::stoi(base_match[5].str())) {
   }
   float quarters() const {
     float wholes = float(nn_) / float(uint32_t(1) << dd_);
@@ -48,6 +65,13 @@ class NoteOn : public NoteBase {
   NoteOn(uint32_t at=0, uint8_t channel=0, uint8_t key=0, uint8_t value=0) :
     NoteBase{at, channel, key}, value_{value} {
   }
+  NoteOn(const std::smatch &base_match) :
+    NoteOn(
+      std::stoi(base_match[1].str()),
+      std::stoi(base_match[3].str()),
+      std::stoi(base_match[4].str()),
+      std::stoi(base_match[5].str())) {
+  }
   uint8_t value_{0};
 };
 
@@ -56,7 +80,12 @@ class NoteOff : public NoteBase {
   NoteOff(uint32_t at=0, uint8_t channel=0, uint8_t key=0) :
     NoteBase{at, channel, key} {
   }
-  uint8_t value_{0};
+  NoteOff(const std::smatch &base_match) :
+    NoteOff(
+      std::stoi(base_match[1].str()),
+      std::stoi(base_match[3].str()),
+      std::stoi(base_match[4].str())) {
+  }
 };
 
 class Note : public NoteBase {
@@ -69,6 +98,7 @@ class Note : public NoteBase {
     uint32_t et=0) :
     NoteBase{at, channel, key}, end_time_{et} {
   }
+  uint32_t Duration() const { return end_time_ - abs_time_; }
   std::string str() const {
     return fmt::format("Note([{}, {}], c={}, key={}, v={})",
       abs_time_, end_time_, channel_, key_, value_);
@@ -163,12 +193,24 @@ int ModiDump2Ly::Parse() {
     while (getting_tracks && (RC() == 0)) {
       getting_tracks = GetTrack(ifs);
     }
+    if (Debug() & 0x2) {
+      std::cout << "#(TimeSignature)={}\n", time_sigs_.size();
+      std::cout << "#(tracks)={}: [\n", tracks_.size();
+      for (size_t i = 0; i < tracks_.size(); ++i) {
+        const Track &track = tracks_[i];
+        std::cout << fmt::format("  [{}] name={}, #(notes)={}\n",
+          i, track.name_, track.notes_.size());
+      }
+      std::cout << "]\n";
+    }
   }
   if (Debug() & 0x1) { std::cerr << "} end of Parse\n"; }
   return RC();
 }
 
 bool ModiDump2Ly::GetTrack(std::istream &ifs) {
+  using key_note_ons_t = std::unordered_map<uint8_t, std::vector<NoteOn>>;
+  key_note_ons_t note_ons;
   bool got = false;
   for (bool skip = true; skip && not ifs.eof(); ) {
     std::string line;
@@ -178,25 +220,46 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
   }
   if (!ifs.eof()) {
     got = true;
-    const std::regex base_regex(
-      "^.*AT=(\\d++),.* "
-      "TimeSignature\\(nn=(\\d+), dd=(\\d+), cc=(\\d+), bb=(\\d+)\\).*");
     Track track;
     std::string line;
-    // while (!(line.starts_with("}") || ifs.eof())) {
     while (!((line.find("}") == 0) || ifs.eof())) {
       std::getline(ifs, line);
       std::smatch base_match;
-      if (std::regex_match(line, base_match, base_regex)) {
-        std::cout << "match_size=" << base_match.size() << '\n';
+      if (std::regex_match(line, base_match, track_name_regex)) {
+        if (base_match.size() == 2) {
+          track.name_ = base_match[1].str();
+        }
+      } else if (std::regex_match(line, base_match, time_seg_regex)) {
+        if (base_match.size() == 6) {
+          TimeSignature ts(base_match);
+          time_sigs_.push_back(std::move(ts));
+        }
+      } else if (std::regex_match(line, base_match, note_on_off_regex)) {
         if (base_match.size() == 6) {
           uint32_t abs_time = std::stoi(base_match[1].str());
-          uint8_t nn = std::stoi(base_match[2].str());
-          uint8_t dd = std::stoi(base_match[3].str());
-          uint8_t cc = std::stoi(base_match[4].str());
-          uint8_t bb = std::stoi(base_match[5].str());
-          TimeSignature ts(abs_time, nn, dd, cc, bb);
-          time_sigs_.push_back(std::move(ts));
+          std::string on_off = base_match[2].str();
+          uint8_t key = std::stoi(base_match[4].str());
+          uint8_t velocity = std::stoi(base_match[5].str());
+          if ((on_off == std::string{"On"}) && (velocity > 0)) {
+            NoteOn note_on{base_match};
+            auto iter = note_ons.find(key);
+            if (iter == note_ons.end()) {
+              iter = note_ons.insert(iter, {key, std::vector<NoteOn>()});
+            }
+            iter->second.push_back(note_on);
+          } else {
+            NoteOff note_off{base_match};
+            auto iter = note_ons.find(key);
+            if ((iter == note_ons.end()) || iter->second.empty()) {
+              std::cerr << fmt::format("Unmatched NoteOff in {}\n", line);
+            } else {
+              const NoteOn &note_on = iter->second.back();
+              Note note{note_on.abs_time_, note_on.channel_, note_on.key_,
+                note_on.value_, note_off.abs_time_};
+              track.notes_.push_back(note);
+              iter->second.pop_back();
+            }
+          }
         }
       }
     }
