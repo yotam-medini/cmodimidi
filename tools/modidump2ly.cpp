@@ -127,6 +127,7 @@ class ModiDump2Ly {
   }
   int Parse();
   bool GetTrack(std::istream &ifs);
+  void WriteLyNotes();
   int rc_{0};
   po::options_description desc_; 
   po::variables_map vm_;
@@ -176,14 +177,17 @@ void ModiDump2Ly::SetArgs(int argc, char **argv) {
 }
 
 int ModiDump2Ly::Run() {
-  if (Debug() & 0x1) { std::cerr << "{Run\n"; }
+  if (debug_ & 0x1) { std::cerr << "{ Run\n"; }
   Parse();
-  if (Debug() & 0x1) { std::cerr << "} end of Run\n"; }
-  return RC();
+  if (rc_ == 0) {
+    WriteLyNotes();
+  }
+  if (debug_ & 0x1) { std::cerr << "} end of Run\n"; }
+  return rc_;
 }
 
 int ModiDump2Ly::Parse() {
-  if (Debug() & 0x1) { std::cerr << "{Parse\n"; }
+  if (debug_ & 0x1) { std::cerr << "{ Parse\n"; }
   std::ifstream ifs(dump_filename_);
   if (ifs.fail()) {
     rc_ = 1;
@@ -193,7 +197,7 @@ int ModiDump2Ly::Parse() {
     while (getting_tracks && (RC() == 0)) {
       getting_tracks = GetTrack(ifs);
     }
-    if (Debug() & 0x2) {
+    if (debug_ & 0x2) {
       std::cout << fmt::format("#(TimeSignature)={}\n", time_sigs_.size());
       std::cout << fmt::format("#(tracks)={}: [\n", tracks_.size());
       for (size_t i = 0; i < tracks_.size(); ++i) {
@@ -205,7 +209,7 @@ int ModiDump2Ly::Parse() {
     }
     ifs.close();
   }
-  if (Debug() & 0x1) { std::cerr << "} end of Parse\n"; }
+  if (debug_ & 0x1) { std::cerr << "} end of Parse\n"; }
   return RC();
 }
 
@@ -267,6 +271,11 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
     tracks_.push_back(std::move(track));
   }         
   return got;
+}
+
+void ModiDump2Ly::WriteLyNotes() {
+  if (debug_ & 0x1) { std::cerr << "{ WriteLyNotes\n"; }
+  if (debug_ & 0x1) { std::cerr << "} end of WriteLyNotes\n"; }
 }
 
 int main(int argc, char **argv) {
