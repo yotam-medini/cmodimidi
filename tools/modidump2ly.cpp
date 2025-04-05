@@ -48,6 +48,8 @@ class TimeSignature {
   uint32_t duration_ticks_{0};
 };
 
+static const TimeSignature time_signature_initial{0, 4, 2, 24, 8}; // 24=0x18
+
 static constexpr uint8_t REST_KEY = 0xff;
 
 class NoteBase {
@@ -237,6 +239,9 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
       } else if (std::regex_match(line, base_match, time_seg_regex)) {
         if (base_match.size() == 6) {
           TimeSignature ts(base_match);
+          if (time_sigs_.empty() && ts.abs_time_ > 0) {
+            time_sigs_.push_back(time_signature_initial);
+          }
           time_sigs_.push_back(std::move(ts));
         }
       } else if (std::regex_match(line, base_match, note_on_off_regex)) {
