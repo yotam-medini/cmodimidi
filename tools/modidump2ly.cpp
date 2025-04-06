@@ -45,6 +45,10 @@ class TimeSignature {
     float qs = 4 * wholes;
     return qs;
   }
+  uint32_t ticks(uint32_t ticks_per_quarter) const {
+    uint32_t ret = (4 * uint32_t{nn_} * ticks_per_quarter + denom_/2) / denom_;
+    return ret;
+  }
   std::string ly_str() const {
     return fmt::format("{}/{}", unsigned{nn_}, unsigned{denom_});
   }
@@ -158,6 +162,7 @@ class ModiDump2Ly {
   std::vector<TimeSignature> time_sigs_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
+  size_t curr_ts_bar_begin{0};
   size_t curr_bar{0}; // 0-based
 };
 
@@ -324,6 +329,7 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   const Track &track = tracks_[ti];
   f_ly << fmt::format("\ntrack{}{} = {}\n", ti, track.name_, "{");
   time_sig_idx = 0;
+  curr_ts_bar_begin = 0;
   f_ly << fmt::format("  \\time {}\n", time_sigs_[0].ly_str());
   curr_bar = 0;
   uint32_t prev_note_end_time = 0;
@@ -337,8 +343,14 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
     }
     if ((time_sig_idx + 1 < time_sigs_.size()) &&
       (time_sigs_[time_sig_idx + 1].abs_time_ <= note.abs_time_)) {
+      const TimeSignature &ts = time_sigs_[time_sig_idx];
+      uint32_t dt = time_sigs_[time_sig_idx + 1].abs_time_ - ts.abs_time_;
+      uint32_t n_bars = dt / ts.ticks(ticks_per_quarter_);
+      curr_bar = curr_ts_bar_begin + n_bars;
       ++time_sig_idx;
-      f_ly << fmt::format("  \\time {}\n", time_sigs_[time_sig_idx].ly_str());
+      curr_ts_bar_begin = curr_bar;
+      f_ly << fmt::format("  % bar {}\n  \\time {}\n",
+        curr_bar + 1, time_sigs_[time_sig_idx].ly_str());
     }
     bool polyphony = false;
     for ( ; (ni + 1 < n_notes) &&
