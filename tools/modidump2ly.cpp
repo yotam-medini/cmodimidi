@@ -335,6 +335,11 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
     if (64 * rest_time > ticks_per_quarter_) {
       WriteKeyDuration(f_ly, "r", rest_time, true);
     }
+    if ((time_sig_idx + 1 < time_sigs_.size()) &&
+      (time_sigs_[time_sig_idx + 1].abs_time_ <= note.abs_time_)) {
+      ++time_sig_idx;
+      f_ly << fmt::format("  \\time {}\n", time_sigs_[time_sig_idx].ly_str());
+    }
     bool polyphony = false;
     for ( ; (ni + 1 < n_notes) &&
       (track.notes_[ni + 1].abs_time_ < note.end_time_); ++ni) {
