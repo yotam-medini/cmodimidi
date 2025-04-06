@@ -11,7 +11,7 @@ namespace po = boost::program_options;
 
 static const std::regex tpq_seg_regex(
   "^.*ticksPer\\(1/4\\)=(\\d+).*");
-static const std::regex time_seg_regex(
+static const std::regex time_sig_regex(
   "^.*AT=(\\d++),.* "
   "TimeSignature\\(nn=(\\d+), dd=(\\d+), cc=(\\d+), bb=(\\d+)\\).*");
 static const std::regex note_on_off_regex(
@@ -28,6 +28,9 @@ class TimeSignature {
     uint8_t dd=0,
     uint8_t cc=0,
     uint8_t bb=0) : abs_time_{at}, nn_{nn}, dd_{dd}, cc_{cc}, bb_{bb} {
+    denom_ = 1;
+    for ( ; dd > 0; --dd, denom_ *= 2) {
+    }
   }
   TimeSignature(const std::smatch &base_match) :
     TimeSignature(
@@ -42,11 +45,15 @@ class TimeSignature {
     float qs = 4 * wholes;
     return qs;
   }
+  std::string ly_str() const {
+    return fmt::format("{}/{}", unsigned{nn_}, unsigned{denom_});
+  }
   uint32_t abs_time_{0};
   uint8_t nn_{0};
   uint8_t dd_{0};
   uint8_t cc_{0};
   uint8_t bb_{0};
+  uint8_t denom_{4};
   uint32_t duration_ticks_{0};
 };
 
@@ -135,9 +142,9 @@ class ModiDump2Ly {
   void WriteTrackNotes(std::ofstream &f_ly, size_t ti);
   void WriteKeyDuration(
     std::ofstream &f_ly,
-    size_t &tsi,
     const std::string &sym,
-    uint32_t duration);
+    uint32_t duration,
+    bool use_ts);
   std::string GetSymKey(uint8_t key, uint8_t key_last) const;
   int rc_{0};
   po::options_description desc_; 
@@ -150,6 +157,8 @@ class ModiDump2Ly {
   uint32_t ticks_per_quarter_{48};
   std::vector<TimeSignature> time_sigs_;
   std::vector<Track> tracks_;
+  size_t time_sig_idx{0};
+  size_t curr_bar{0}; // 0-based
 };
 
 ModiDump2Ly::ModiDump2Ly() {
@@ -253,7 +262,7 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
         if (base_match.size() == 2) {
           track.name_ = base_match[1].str();
         }
-      } else if (std::regex_match(line, base_match, time_seg_regex)) {
+      } else if (std::regex_match(line, base_match, time_sig_regex)) {
         if (base_match.size() == 6) {
           TimeSignature ts(base_match);
           if (time_sigs_.empty() && ts.abs_time_ > 0) {
@@ -314,7 +323,9 @@ void ModiDump2Ly::WriteLyNotes() {
 void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   const Track &track = tracks_[ti];
   f_ly << fmt::format("\ntrack{}{} = {}\n", ti, track.name_, "{");
-  size_t tsi = 0;
+  time_sig_idx = 0;
+  f_ly << fmt::format("  \\time {}\n", time_sigs_[0].ly_str());
+  curr_bar = 0;
   uint32_t prev_note_end_time = 0;
   const size_t n_notes = track.notes_.size();
   uint8_t key_last = 0;
@@ -322,21 +333,23 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
     const Note &note = track.notes_[ni];
     uint32_t rest_time = note.abs_time_ - prev_note_end_time;
     if (64 * rest_time > ticks_per_quarter_) {
-      WriteKeyDuration(f_ly, tsi, "r", rest_time);
+      WriteKeyDuration(f_ly, "r", rest_time, true);
     }
     bool polyphony = false;
     for ( ; (ni + 1 < n_notes) &&
       (track.notes_[ni + 1].abs_time_ < note.end_time_); ++ni) {
       if (!polyphony) {
         f_ly << "\n  % polyphony: ";
+        const std::string key_sym = GetSymKey(note.key_, note.key_);
+        WriteKeyDuration(f_ly, key_sym, note.Duration(), false);
         polyphony = true;
       }
     }
     if (polyphony) {
-      f_ly << "\n  ";
+      f_ly << "\n";
     }
     const std::string key_sym = GetSymKey(note.key_, key_last);
-    WriteKeyDuration(f_ly, tsi, key_sym, note.Duration());
+    WriteKeyDuration(f_ly, key_sym, note.Duration(), true);
     key_last = note.key_;
     prev_note_end_time = note.end_time_;
   }
@@ -345,9 +358,9 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
 
 void ModiDump2Ly::WriteKeyDuration(
   std::ofstream &f_ly,
-  size_t &tsi,
   const std::string &sym,
-  uint32_t duration) {
+  uint32_t duration,
+  bool use_ts) {
 }
 
 std::string ModiDump2Ly::GetSymKey(uint8_t key, uint8_t key_last) const {
