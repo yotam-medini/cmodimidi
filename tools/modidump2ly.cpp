@@ -325,7 +325,7 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
       WriteKeyDuration(f_ly, tsi, "r", rest_time);
     }
     bool polyphony = false;
-    for ( ; (ni + 1 << n_notes) &&
+    for ( ; (ni + 1 < n_notes) &&
       (track.notes_[ni + 1].abs_time_ < note.end_time_); ++ni) {
       if (!polyphony) {
         f_ly << "\n  % polyphony: ";
