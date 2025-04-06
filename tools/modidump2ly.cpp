@@ -133,6 +133,12 @@ class ModiDump2Ly {
   bool GetTrack(std::istream &ifs);
   void WriteLyNotes();
   void WriteTrackNotes(std::ofstream &f_ly, size_t ti);
+  void WriteKeyDuration(
+    std::ofstream &f_ly,
+    size_t &tsi,
+    const std::string &sym,
+    uint32_t duration);
+  std::string GetSymKey(uint8_t key, uint8_t key_last) const;
   int rc_{0};
   po::options_description desc_; 
   po::variables_map vm_;
@@ -140,6 +146,7 @@ class ModiDump2Ly {
   std::string ly_filename_;
   std::string debug_raw_;
   uint32_t debug_{0};
+  bool flat_{false};
   uint32_t ticks_per_quarter_{48};
   std::vector<TimeSignature> time_sigs_;
   std::vector<Track> tracks_;
@@ -158,7 +165,7 @@ void ModiDump2Ly::SetOptions() {
     ("output,o",
       po::value<std::string>(&ly_filename_),
       "Output in Lilypond format (required)")
-    ("flat", po::bool_switch()->default_value(false),
+    ("flat", po::bool_switch(&flat_)->default_value(false),
       "Prefer flats♭ to default sharps♯")
     ("debug", po::value<std::string>(&debug_raw_)->default_value("0"),
       "Debug flags (hex ok)")
@@ -310,12 +317,65 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   size_t tsi = 0;
   uint32_t prev_note_end_time = 0;
   const size_t n_notes = track.notes_.size();
+  uint8_t key_last = 0;
   for (size_t ni = 0; ni < n_notes; ++ni) {
     const Note &note = track.notes_[ni];
     uint32_t rest_time = note.abs_time_ - prev_note_end_time;
+    if (64 * rest_time > ticks_per_quarter_) {
+      WriteKeyDuration(f_ly, tsi, "r", rest_time);
+    }
+    bool polyphony = false;
+    for ( ; (ni + 1 << n_notes) &&
+      (track.notes_[ni + 1].abs_time_ < note.end_time_); ++ni) {
+      if (!polyphony) {
+        f_ly << "\n  % polyphony: ";
+        polyphony = true;
+      }
+    }
+    if (polyphony) {
+      f_ly << "\n  ";
+    }
+    const std::string key_sym = GetSymKey(note.key_, key_last);
+    WriteKeyDuration(f_ly, tsi, key_sym, note.Duration());
+    key_last = note.key_;
     prev_note_end_time = note.end_time_;
   }
   f_ly << "}\n";
+}
+
+void ModiDump2Ly::WriteKeyDuration(
+  std::ofstream &f_ly,
+  size_t &tsi,
+  const std::string &sym,
+  uint32_t duration) {
+}
+
+std::string ModiDump2Ly::GetSymKey(uint8_t key, uint8_t key_last) const {
+  using vs_t = std::vector<std::string>;
+  using vi_t = std::vector<int>;
+  static const vs_t syms_flat{
+    "c", "df", "d", "ef", "e", "f", "gf", "g", "af", "a", "bf", "b"};
+  static const vs_t syms_sharp{
+    "c", "cs", "d", "ds", "e", "f", "fs", "g", "gs", "a", "as", "b"};
+  static const vi_t syms_index_flat{0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6};
+  static const vi_t syms_index_sharp{0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6};
+  const vs_t &syms = (flat_ ? syms_flat : syms_sharp);
+  const vi_t &syms_index = (flat_ ? syms_index_flat : syms_index_sharp);
+  uint8_t key_mod12 = key % 12;
+  uint8_t key_last_mod12 = key_last % 12;
+  std::string sym{syms[key_mod12]};
+  int sym_idx = syms_index[key_mod12];
+  int sym_idx_last = syms_index[key_last_mod12];
+  if (key_last < key) {
+    if (((sym_idx + 7 - sym_idx_last) % 7) > 3) {
+      sym.push_back('\'');
+    }
+  } else if (key < key_last) {
+    if (((sym_idx_last + 7 - sym_idx) % 7) > 3) {
+      sym.push_back(',');
+    }
+  }
+  return sym;
 }
 
 int main(int argc, char **argv) {
