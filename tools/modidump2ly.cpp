@@ -9,6 +9,8 @@
 
 namespace po = boost::program_options;
 
+static const std::regex tpq_seg_regex(
+  "^.*ticksPer\\(1/4\\)=(\\d+).*");
 static const std::regex time_seg_regex(
   "^.*AT=(\\d++),.* "
   "TimeSignature\\(nn=(\\d+), dd=(\\d+), cc=(\\d+), bb=(\\d+)\\).*");
@@ -130,6 +132,7 @@ class ModiDump2Ly {
   int Parse();
   bool GetTrack(std::istream &ifs);
   void WriteLyNotes();
+  void WriteTrackNotes(std::ofstream &f_ly, size_t ti);
   int rc_{0};
   po::options_description desc_; 
   po::variables_map vm_;
@@ -137,6 +140,7 @@ class ModiDump2Ly {
   std::string ly_filename_;
   std::string debug_raw_;
   uint32_t debug_{0};
+  uint32_t ticks_per_quarter_{48};
   std::vector<TimeSignature> time_sigs_;
   std::vector<Track> tracks_;
 };
@@ -200,6 +204,7 @@ int ModiDump2Ly::Parse() {
       getting_tracks = GetTrack(ifs);
     }
     if (debug_ & 0x2) {
+      std::cout << fmt::format("ticksPerQuarter={}\n", ticks_per_quarter_);
       std::cout << fmt::format("#(TimeSignature)={}\n", time_sigs_.size());
       std::cout << fmt::format("#(tracks)={}: [\n", tracks_.size());
       for (size_t i = 0; i < tracks_.size(); ++i) {
@@ -222,7 +227,12 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
   for (bool skip = true; skip && not ifs.eof(); ) {
     std::string line;
     std::getline(ifs, line);
-    // skip = not line.starts_with("Track");
+    std::smatch base_match;
+    if (std::regex_match(line, base_match, tpq_seg_regex)) {
+      if (base_match.size() == 2) {
+        ticks_per_quarter_ = std::stoi(base_match[1].str());
+      }
+    }
     skip = (line.find("Track") != 0);
   }
   if (!ifs.eof()) {
@@ -280,7 +290,32 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
 
 void ModiDump2Ly::WriteLyNotes() {
   if (debug_ & 0x1) { std::cerr << "{ WriteLyNotes\n"; }
+  std::ofstream f_ly(ly_filename_);
+  if (f_ly.fail()) {
+    std::cerr << fmt::format("Failed to open {}\n", ly_filename_);
+    rc_ = 1;
+  } else {
+    for (size_t ti = 0; (rc_ == 0) && (ti < tracks_.size()); ++ti) {
+      if (!tracks_[ti].notes_.empty()) {
+        WriteTrackNotes(f_ly, ti);
+      }
+    }
+  }
   if (debug_ & 0x1) { std::cerr << "} end of WriteLyNotes\n"; }
+}
+
+void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
+  const Track &track = tracks_[ti];
+  f_ly << fmt::format("\ntrack{}{} = {}\n", ti, track.name_, "{");
+  size_t tsi = 0;
+  uint32_t prev_note_end_time = 0;
+  const size_t n_notes = track.notes_.size();
+  for (size_t ni = 0; ni < n_notes; ++ni) {
+    const Note &note = track.notes_[ni];
+    uint32_t rest_time = note.abs_time_ - prev_note_end_time;
+    prev_note_end_time = note.end_time_;
+  }
+  f_ly << "}\n";
 }
 
 int main(int argc, char **argv) {
