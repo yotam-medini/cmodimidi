@@ -439,49 +439,35 @@ void ModiDump2Ly::WriteKeyDuration(
       f_ly << fmt::format(" {}1", sym);
       duration -= WholeTicks();
     }
-    if (duration >= 6 * ticks_per_quarter_) {
-      f_ly << fmt::format(" {}1.", sym);
-      duration -= 6 * ticks_per_quarter_;
-    }
-    if (duration >= WholeTicks()) {
-      f_ly << fmt::format(" {}1", sym);
-      duration -= WholeTicks();
-    }
-    if (duration >= 3*ticks_per_quarter_) {
-      f_ly << fmt::format(" {}2.", sym);
-      duration -= 3*ticks_per_quarter_;
-    }
-    if (duration >= 2*ticks_per_quarter_) {
-      f_ly << fmt::format(" {}2", sym);
-      duration -= 2*ticks_per_quarter_;
-    }
-    if (duration >= (3*ticks_per_quarter_)/2) {
-      f_ly << fmt::format(" {}4.", sym);
-      duration -= (3*ticks_per_quarter_)/2;
-    }
-    if (duration >= ticks_per_quarter_) {
-      f_ly << fmt::format(" {}4", sym);
-      duration -= ticks_per_quarter_;
-    }
-    if (duration >= ((3*ticks_per_quarter_)/4)) {
-      f_ly << fmt::format(" {}8.", sym);
-      duration -= (3*ticks_per_quarter_)/4;
-    }
-    if (duration >= (ticks_per_quarter_/2)) {
-      f_ly << fmt::format(" {}8", sym);
-      duration -= ticks_per_quarter_/2;
-    }
-    if (duration >= (ticks_per_quarter_/2)) {
-      f_ly << fmt::format(" {}8", sym);
-      duration -= ticks_per_quarter_/2;
-    }
-    if (duration >= (ticks_per_quarter_/4)) {
-      f_ly << fmt::format(" {}16", sym);
-      duration -= ticks_per_quarter_/4;
-    }
-    if (duration >= (ticks_per_quarter_/8)) {
-      f_ly << fmt::format(" {}32", sym);
-      duration -= ticks_per_quarter_/8;
+    class QRule {
+     public:
+      QRule(uint32_t n=0, uint32_t d=1, const std::string &s="") :
+        numerator_{n}, denominator_{d}, sym_{s} {
+      }
+      uint32_t Delta(uint32_t tpq) const {
+        return (numerator_ * tpq) / denominator_;
+      }
+      uint32_t numerator_{0};
+      uint32_t denominator_{1};
+      std::string sym_;
+    };
+    static std::vector<QRule> qrules{
+      QRule{6, 1, "1."},
+      QRule{4, 1, "1"},
+      QRule{3, 1, "2."},
+      QRule{2, 1, "2"},
+      QRule{3, 2, "4."},
+      QRule{1, 1, "4"},
+      QRule{3, 4, "8."},
+      QRule{1, 2, "8"},
+      QRule{1, 4, "16"},
+      QRule{1, 8, "32"}};
+    for (const QRule &qrule: qrules) {
+      const uint32_t delta = qrule.Delta(ticks_per_quarter_);
+      if (duration >= delta) {
+        f_ly << fmt::format(" {}{}", sym, qrule.sym_);
+        duration -= delta;
+      }
     }
     tbegin = et;
   }
