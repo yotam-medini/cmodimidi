@@ -48,7 +48,7 @@ std::string EndOfTrackEvent::str() const {
 }
 
 std::string TempoEvent::str() const {
-  return fmt::format("Port({})", tttttt_);
+  return fmt::format("Tempo({})", tttttt_);
 }
 
 std::string SmpteOffsetEvent::str() const {
