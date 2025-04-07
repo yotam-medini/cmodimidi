@@ -45,7 +45,7 @@ class TimeSignature {
     float qs = 4 * wholes;
     return qs;
   }
-  uint32_t ticks(uint32_t ticks_per_quarter) const {
+  uint32_t Ticks(uint32_t ticks_per_quarter) const {
     uint32_t ret = (4 * uint32_t{nn_} * ticks_per_quarter + denom_/2) / denom_;
     return ret;
   }
@@ -147,9 +147,18 @@ class ModiDump2Ly {
   void WriteKeyDuration(
     std::ofstream &f_ly,
     const std::string &sym,
-    uint32_t duration,
-    bool use_ts);
+    uint32_t tbegin,
+    const uint32_t tend,
+    const bool use_ts);
   std::string GetSymKey(uint8_t key, uint8_t key_last) const;
+  bool IsNextTimeSig(uint32_t t) const {
+    return ((time_sig_idx + 1 < time_sigs_.size()) && 
+      (time_sigs_[time_sig_idx + 1].abs_time_ <= t));
+  }
+  uint32_t WholeTicks() const { return 4*ticks_per_quarter_; }
+  uint32_t TsTicks(const TimeSignature &ts) const {
+    return ts.Ticks(ticks_per_quarter_);
+  }
   int rc_{0};
   po::options_description desc_; 
   po::variables_map vm_;
@@ -159,6 +168,7 @@ class ModiDump2Ly {
   uint32_t debug_{0};
   bool flat_{false};
   uint32_t ticks_per_quarter_{48};
+  uint32_t small_time_{0};
   std::vector<TimeSignature> time_sigs_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
@@ -252,6 +262,7 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
     if (std::regex_match(line, base_match, tpq_seg_regex)) {
       if (base_match.size() == 2) {
         ticks_per_quarter_ = std::stoi(base_match[1].str());
+        small_time_ = ticks_per_quarter_ / 64;
       }
     }
     skip = (line.find("Track") != 0);
@@ -330,7 +341,7 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   f_ly << fmt::format("\ntrack{}{} = {}\n", ti, track.name_, "{");
   time_sig_idx = 0;
   curr_ts_bar_begin = 0;
-  f_ly << fmt::format("  \\time {}\n", time_sigs_[0].ly_str());
+  f_ly << fmt::format("  \\time {}\n ", time_sigs_[0].ly_str());
   curr_bar = 0;
   uint32_t prev_note_end_time = 0;
   const size_t n_notes = track.notes_.size();
@@ -338,18 +349,17 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   for (size_t ni = 0; ni < n_notes; ++ni) {
     const Note &note = track.notes_[ni];
     uint32_t rest_time = note.abs_time_ - prev_note_end_time;
-    if (64 * rest_time > ticks_per_quarter_) {
-      WriteKeyDuration(f_ly, "r", rest_time, true);
+    if (rest_time > small_time_) {
+      WriteKeyDuration(f_ly, "r", prev_note_end_time, note.abs_time_, true);
     }
-    if ((time_sig_idx + 1 < time_sigs_.size()) &&
-      (time_sigs_[time_sig_idx + 1].abs_time_ <= note.abs_time_)) {
+    if (IsNextTimeSig(note.abs_time_)) {
       const TimeSignature &ts = time_sigs_[time_sig_idx];
       uint32_t dt = time_sigs_[time_sig_idx + 1].abs_time_ - ts.abs_time_;
-      uint32_t n_bars = dt / ts.ticks(ticks_per_quarter_);
+      uint32_t n_bars = dt / TsTicks(ts);
       curr_bar = curr_ts_bar_begin + n_bars;
       ++time_sig_idx;
       curr_ts_bar_begin = curr_bar;
-      f_ly << fmt::format("  % bar {}\n  \\time {}\n",
+      f_ly << fmt::format("  % bar {}\n  \\time {}\n ",
         curr_bar + 1, time_sigs_[time_sig_idx].ly_str());
     }
     bool polyphony = false;
@@ -358,26 +368,102 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
       if (!polyphony) {
         f_ly << "\n  % polyphony: ";
         const std::string key_sym = GetSymKey(note.key_, note.key_);
-        WriteKeyDuration(f_ly, key_sym, note.Duration(), false);
+        WriteKeyDuration(f_ly, key_sym, note.abs_time_, note.end_time_, false);
         polyphony = true;
       }
     }
     if (polyphony) {
-      f_ly << "\n";
+      f_ly << "\n ";
     }
     const std::string key_sym = GetSymKey(note.key_, key_last);
-    WriteKeyDuration(f_ly, key_sym, note.Duration(), true);
+    WriteKeyDuration(f_ly, key_sym, note.abs_time_, note.end_time_, true);
     key_last = note.key_;
     prev_note_end_time = note.end_time_;
   }
-  f_ly << "}\n";
+  f_ly << "\n}\n";
 }
 
 void ModiDump2Ly::WriteKeyDuration(
   std::ofstream &f_ly,
   const std::string &sym,
-  uint32_t duration,
-  bool use_ts) {
+  uint32_t tbegin,
+  const uint32_t tend,
+  const bool use_ts) {
+  while (tbegin + small_time_ < tend) {
+    const TimeSignature &ts = time_sigs_[time_sig_idx];
+    uint32_t et = tend;
+    if (use_ts) {
+      uint32_t curr_ts_bars = curr_bar - curr_ts_bar_begin;
+      uint32_t end_of_bar = ts.abs_time_ + (curr_ts_bars + 1)*TsTicks(ts);
+      if (tbegin + small_time_ >= end_of_bar) {
+         ++curr_bar;
+         f_ly << fmt::format("\n  % bar {}\n ", curr_bar + 1);
+         tbegin += small_time_;
+         if (IsNextTimeSig(tbegin)) {
+           ++time_sig_idx;
+           curr_ts_bar_begin = curr_bar;
+           f_ly << fmt::format(" \\time {}\n ",
+             time_sigs_[time_sig_idx].ly_str());
+         }
+         const TimeSignature &ts1 = time_sigs_[time_sig_idx];
+         curr_ts_bars = curr_bar - curr_ts_bar_begin;
+         end_of_bar = ts1.abs_time_ + (curr_ts_bars + 1)*TsTicks(ts1);
+      }
+      if (et > end_of_bar) {
+        et = end_of_bar;
+      }
+    }
+    uint32_t duration = et - tbegin;
+    while (duration >= 2*WholeTicks()) {
+      f_ly << fmt::format(" {}1", sym);
+      duration -= WholeTicks();
+    }
+    if (duration >= 6 * ticks_per_quarter_) {
+      f_ly << fmt::format(" {}1.", sym);
+      duration -= 6 * ticks_per_quarter_;
+    }
+    if (duration >= WholeTicks()) {
+      f_ly << fmt::format(" {}1", sym);
+      duration -= WholeTicks();
+    }
+    if (duration >= 3*ticks_per_quarter_) {
+      f_ly << fmt::format(" {}2.", sym);
+      duration -= 3*ticks_per_quarter_;
+    }
+    if (duration >= 2*ticks_per_quarter_) {
+      f_ly << fmt::format(" {}2", sym);
+      duration -= 2*ticks_per_quarter_;
+    }
+    if (duration >= (3*ticks_per_quarter_)/2) {
+      f_ly << fmt::format(" {}4.", sym);
+      duration -= (3*ticks_per_quarter_)/2;
+    }
+    if (duration >= ticks_per_quarter_) {
+      f_ly << fmt::format(" {}4", sym);
+      duration -= ticks_per_quarter_;
+    }
+    if (duration >= ((3*ticks_per_quarter_)/4)) {
+      f_ly << fmt::format(" {}8.", sym);
+      duration -= (3*ticks_per_quarter_)/4;
+    }
+    if (duration >= (ticks_per_quarter_/2)) {
+      f_ly << fmt::format(" {}8", sym);
+      duration -= ticks_per_quarter_/2;
+    }
+    if (duration >= (ticks_per_quarter_/2)) {
+      f_ly << fmt::format(" {}8", sym);
+      duration -= ticks_per_quarter_/2;
+    }
+    if (duration >= (ticks_per_quarter_/4)) {
+      f_ly << fmt::format(" {}16", sym);
+      duration -= ticks_per_quarter_/4;
+    }
+    if (duration >= (ticks_per_quarter_/8)) {
+      f_ly << fmt::format(" {}32", sym);
+      duration -= ticks_per_quarter_/8;
+    }
+    tbegin = et;
+  }
 }
 
 std::string ModiDump2Ly::GetSymKey(uint8_t key, uint8_t key_last) const {
@@ -387,7 +473,8 @@ std::string ModiDump2Ly::GetSymKey(uint8_t key, uint8_t key_last) const {
     "c", "df", "d", "ef", "e", "f", "gf", "g", "af", "a", "bf", "b"};
   static const vs_t syms_sharp{
     "c", "cs", "d", "ds", "e", "f", "fs", "g", "gs", "a", "as", "b"};
-  static const vi_t syms_index_flat{0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6};
+                                  // C     D     E  F     G     A     B
+  static const vi_t syms_index_flat {0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6};
   static const vi_t syms_index_sharp{0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6};
   const vs_t &syms = (flat_ ? syms_flat : syms_sharp);
   const vi_t &syms_index = (flat_ ? syms_index_flat : syms_index_sharp);
