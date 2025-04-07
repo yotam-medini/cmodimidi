@@ -14,8 +14,6 @@ static const std::regex tpq_seg_regex(
 static const std::regex time_sig_regex(
   "^.*AT=(\\d++),.* "
   "TimeSignature\\(nn=(\\d+), dd=(\\d+), cc=(\\d+), bb=(\\d+)\\).*");
-static const std::regex tempo_sig_regex(
-  "^.*AT=(\\d++),.* Tempo\\((\\d+)\\).*");
 static const std::regex note_on_off_regex(
   "^.*AT=(\\d++),.* "
   "Note([Ofn]+)\\(channel=(\\d+), key=(\\d+), velocity=(\\d+)\\).*");
@@ -64,62 +62,6 @@ class TimeSignature {
 };
 
 static const TimeSignature time_signature_initial{0, 4, 2, 24, 8}; // 24=0x18
-
-class Tempo {
- public:
-  Tempo(uint32_t at=0, uint32_t tttttt=0) : abs_time_{at}, tttttt_{tttttt} {
-  }
-  Tempo(const std::smatch &base_match) :
-    Tempo(
-      std::stoi(base_match[1].str()),
-      std::stoi(base_match[2].str())) {
-  }
-  uint32_t abs_time_{0};
-  uint32_t tttttt_{0};
-};
-
-static const Tempo tempo_initial{0, 500000};
-
-class DynamicTiming {
- public:
-  DynamicTiming(
-    uint64_t microseconds_per_quarter=0,
-    uint64_t k_ticks_per_quarter=0,
-    uint32_t ticks_ref=0,
-    uint32_t ms_ref=0) : 
-      microseconds_per_quarter_{microseconds_per_quarter},
-      k_ticks_per_quarter_{k_ticks_per_quarter},
-      ticks_ref_{ticks_ref},
-      ms_ref_{ms_ref} {
-  }
-  void SetMicrosecondsPerQuarter(uint32_t curr_ticks, uint64_t ms_per_quarter) {
-    ms_ref_ = AbsTicksToMs(curr_ticks);
-    ticks_ref_ = curr_ticks;
-    microseconds_per_quarter_ = ms_per_quarter;
-  }
-  uint32_t AbsTicksToMs(uint32_t abs_ticks) {
-    uint64_t numer = uint64_t{abs_ticks - ticks_ref_} *
-      microseconds_per_quarter_;
-    uint32_t add = RoundDiv(numer, k_ticks_per_quarter_);
-    uint32_t ms = ms_ref_ + add;
-    return ms;
-  }
- private:
-  static uint32_t RoundDiv(uint64_t n, uint64_t d) {
-    static const uint64_t u64max32 = std::numeric_limits<uint32_t>::max();
-    uint64_t q = (n + d/2) / d;
-    if (q > u64max32) {
-      std::cerr << fmt::format("overflow @ RoundDiv({}, {})", n, d);
-    }
-    uint32_t ret = static_cast<uint32_t>(q);
-    return ret;
-  }
-  uint64_t microseconds_per_quarter_{0};
-  uint64_t k_ticks_per_quarter_{0};
-  uint32_t ticks_ref_{0};
-  uint32_t ms_ref_{0};
-};
-
 
 class NoteBase {
  public:
@@ -219,10 +161,6 @@ class ModiDump2Ly {
     return ((time_sig_idx + 1 < time_sigs_.size()) && 
       (time_sigs_[time_sig_idx + 1].abs_time_ <= t));
   }
-  bool IsNextTempo(uint32_t t) const {
-    return ((tempo_idx + 1 < tempos_.size()) && 
-      (tempos_[tempo_idx + 1].abs_time_ <= t));
-  }
   uint32_t WholeTicks() const { return 4*ticks_per_quarter_; }
   uint32_t TsTicks(const TimeSignature &ts) const {
     return ts.Ticks(ticks_per_quarter_);
@@ -238,11 +176,8 @@ class ModiDump2Ly {
   uint32_t ticks_per_quarter_{48};
   uint32_t small_time_{0};
   std::vector<TimeSignature> time_sigs_;
-  std::vector<Tempo> tempos_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
-  size_t tempo_idx{0};
-  DynamicTiming dynamic_timing;
   size_t curr_ts_bar_begin{0};
   size_t curr_bar{0}; // 0-based
 };
@@ -308,7 +243,6 @@ int ModiDump2Ly::Parse() {
     if (debug_ & 0x2) {
       std::cout << fmt::format("ticksPerQuarter={}\n", ticks_per_quarter_);
       std::cout << fmt::format("#(TimeSignature)={}\n", time_sigs_.size());
-      std::cout << fmt::format("#(Tempos)={}\n", tempos_.size());
       std::cout << fmt::format("#(tracks)={}: [\n", tracks_.size());
       for (size_t i = 0; i < tracks_.size(); ++i) {
         const Track &track = tracks_[i];
@@ -329,9 +263,6 @@ int ModiDump2Ly::Parse() {
   }
   if (time_sigs_.empty()) {
     time_sigs_.push_back(time_signature_initial);
-  }
-  if (tempos_.empty()) {
-    tempos_.push_back(tempo_initial);
   }
   if (debug_ & 0x1) { std::cerr << "} end of Parse\n"; }
   return RC();
@@ -371,14 +302,6 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
             time_sigs_.push_back(time_signature_initial);
           }
           time_sigs_.push_back(std::move(ts));
-        }
-      } else if (std::regex_match(line, base_match, tempo_sig_regex)) {
-        if (base_match.size() == 2) {
-          Tempo tempo{base_match};
-          if (tempos_.empty() && (tempo.abs_time_ > 0)) {
-            tempos_.push_back(tempo_initial);
-          }
-          tempos_.push_back(std::move(tempo));
         }
       } else if (std::regex_match(line, base_match, note_on_off_regex)) {
         if (base_match.size() == 6) {
@@ -434,9 +357,6 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   const Track &track = tracks_[ti];
   f_ly << fmt::format("\ntrack{}{} = {}\n", ti, track.name_, "{");
   time_sig_idx = 0;
-  tempo_idx = 0;
-  const Tempo &tempo0 = tempos_[0];
-  // dynamic_timing.SetMicrosecondsPerQuarter(tempo0.abs_time_, tempo0.tttttt_);
   curr_ts_bar_begin = 0;
   f_ly << fmt::format("  \\time {}\n ", time_sigs_[0].ly_str());
   curr_bar = 0;
@@ -458,11 +378,6 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
       curr_ts_bar_begin = curr_bar;
       f_ly << fmt::format("  % bar {}\n  \\time {}\n ",
         curr_bar + 1, time_sigs_[time_sig_idx].ly_str());
-    }
-    if (IsNextTempo(note.abs_time_)) {
-      ++tempo_idx;
-      const Tempo &tempo = tempos_[tempo_idx];
-      // dynamic_timing.SetMicrosecondsPerQuarter(tempo.abs_time_, tempo.tttttt_);
     }
     bool polyphony = false;
     const uint8_t key_base = note.key_;
