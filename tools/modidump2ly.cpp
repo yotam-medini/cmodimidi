@@ -80,6 +80,47 @@ class Tempo {
 
 static const Tempo tempo_initial{0, 500000};
 
+class DynamicTiming {
+ public:
+  DynamicTiming(
+    uint64_t microseconds_per_quarter=0,
+    uint64_t k_ticks_per_quarter=0,
+    uint32_t ticks_ref=0,
+    uint32_t ms_ref=0) : 
+      microseconds_per_quarter_{microseconds_per_quarter},
+      k_ticks_per_quarter_{k_ticks_per_quarter},
+      ticks_ref_{ticks_ref},
+      ms_ref_{ms_ref} {
+  }
+  void SetMicrosecondsPerQuarter(uint32_t curr_ticks, uint64_t ms_per_quarter) {
+    ms_ref_ = AbsTicksToMs(curr_ticks);
+    ticks_ref_ = curr_ticks;
+    microseconds_per_quarter_ = ms_per_quarter;
+  }
+  uint32_t AbsTicksToMs(uint32_t abs_ticks) {
+    uint64_t numer = uint64_t{abs_ticks - ticks_ref_} *
+      microseconds_per_quarter_;
+    uint32_t add = RoundDiv(numer, k_ticks_per_quarter_);
+    uint32_t ms = ms_ref_ + add;
+    return ms;
+  }
+ private:
+  static uint32_t RoundDiv(uint64_t n, uint64_t d) {
+    static const uint64_t u64max32 = std::numeric_limits<uint32_t>::max();
+    uint64_t q = (n + d/2) / d;
+    if (q > u64max32) {
+      std::cerr << fmt::format("overflow @ RoundDiv({}, {})", n, d);
+    }
+    uint32_t ret = static_cast<uint32_t>(q);
+    return ret;
+  }
+  uint64_t microseconds_per_quarter_{0};
+  uint64_t k_ticks_per_quarter_{0};
+  uint32_t ticks_ref_{0};
+  uint32_t ms_ref_{0};
+};
+
+
 class NoteBase {
  public:
   NoteBase(uint32_t at=0, uint8_t channel=0, uint8_t key=0) :
@@ -178,6 +219,10 @@ class ModiDump2Ly {
     return ((time_sig_idx + 1 < time_sigs_.size()) && 
       (time_sigs_[time_sig_idx + 1].abs_time_ <= t));
   }
+  bool IsNextTempo(uint32_t t) const {
+    return ((tempo_idx + 1 < tempos_.size()) && 
+      (tempos_[tempo_idx + 1].abs_time_ <= t));
+  }
   uint32_t WholeTicks() const { return 4*ticks_per_quarter_; }
   uint32_t TsTicks(const TimeSignature &ts) const {
     return ts.Ticks(ticks_per_quarter_);
@@ -196,6 +241,8 @@ class ModiDump2Ly {
   std::vector<Tempo> tempos_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
+  size_t tempo_idx{0};
+  DynamicTiming dynamic_timing;
   size_t curr_ts_bar_begin{0};
   size_t curr_bar{0}; // 0-based
 };
@@ -261,11 +308,20 @@ int ModiDump2Ly::Parse() {
     if (debug_ & 0x2) {
       std::cout << fmt::format("ticksPerQuarter={}\n", ticks_per_quarter_);
       std::cout << fmt::format("#(TimeSignature)={}\n", time_sigs_.size());
+      std::cout << fmt::format("#(Tempos)={}\n", tempos_.size());
       std::cout << fmt::format("#(tracks)={}: [\n", tracks_.size());
       for (size_t i = 0; i < tracks_.size(); ++i) {
         const Track &track = tracks_[i];
         std::cout << fmt::format("  [{}] name={}, #(notes)={}\n",
           i, track.name_, track.notes_.size());
+        if (debug_ & 0x4) {
+          for (size_t ni = 0; ni < track.notes_.size(); ++ni) {
+            const Note &note = track.notes_[ni];
+            std::cout << fmt::format(
+              "    [{:4d} [{:5d},{:5d}) key={} duration={}\n",
+              ni, note.abs_time_, note.end_time_, note.key_, note.Duration());
+          }
+        }
       }
       std::cout << "]\n";
     }
@@ -378,6 +434,9 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   const Track &track = tracks_[ti];
   f_ly << fmt::format("\ntrack{}{} = {}\n", ti, track.name_, "{");
   time_sig_idx = 0;
+  tempo_idx = 0;
+  const Tempo &tempo0 = tempos_[0];
+  // dynamic_timing.SetMicrosecondsPerQuarter(tempo0.abs_time_, tempo0.tttttt_);
   curr_ts_bar_begin = 0;
   f_ly << fmt::format("  \\time {}\n ", time_sigs_[0].ly_str());
   curr_bar = 0;
@@ -399,6 +458,11 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
       curr_ts_bar_begin = curr_bar;
       f_ly << fmt::format("  % bar {}\n  \\time {}\n ",
         curr_bar + 1, time_sigs_[time_sig_idx].ly_str());
+    }
+    if (IsNextTempo(note.abs_time_)) {
+      ++tempo_idx;
+      const Tempo &tempo = tempos_[tempo_idx];
+      // dynamic_timing.SetMicrosecondsPerQuarter(tempo.abs_time_, tempo.tttttt_);
     }
     bool polyphony = false;
     const uint8_t key_base = note.key_;
@@ -429,16 +493,18 @@ void ModiDump2Ly::WriteKeyDuration(
   uint32_t tbegin,
   const uint32_t tend,
   const bool use_ts) {
+  const bool is_rest = (sym == std::string("r"));
   while (tbegin + small_time_ < tend) {
     const TimeSignature &ts = time_sigs_[time_sig_idx];
+    const uint32_t small_add = is_rest ? small_time_ : 0;
     uint32_t et = tend;
     if (use_ts) {
       uint32_t curr_ts_bars = curr_bar - curr_ts_bar_begin;
       uint32_t end_of_bar = ts.abs_time_ + (curr_ts_bars + 1)*TsTicks(ts);
-      if (tbegin + small_time_ >= end_of_bar) {
+      if (tbegin + small_add >= end_of_bar) {
          ++curr_bar;
          f_ly << fmt::format("\n  % bar {}\n ", curr_bar + 1);
-         tbegin += small_time_;
+         tbegin += small_add;
          if (IsNextTimeSig(tbegin)) {
            ++time_sig_idx;
            curr_ts_bar_begin = curr_bar;
@@ -453,7 +519,7 @@ void ModiDump2Ly::WriteKeyDuration(
         et = end_of_bar;
       }
     }
-    uint32_t duration = et - tbegin;
+    uint32_t duration = (et - tbegin) + small_time_;
     while (duration >= 2*WholeTicks()) {
       f_ly << fmt::format(" {}1", sym);
       duration -= WholeTicks();
