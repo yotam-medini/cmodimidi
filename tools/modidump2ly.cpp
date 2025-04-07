@@ -151,7 +151,7 @@ class ModiDump2Ly {
     const std::string &sym,
     uint32_t tbegin,
     const uint32_t tend,
-    const bool use_ts);
+    const bool wet);
   std::string GetChordSym(
     const vnotes_t &notes,
     size_t &ni,
@@ -180,6 +180,7 @@ class ModiDump2Ly {
   size_t time_sig_idx{0};
   size_t curr_ts_bar_begin{0};
   size_t curr_bar{0}; // 0-based
+  std::string curr_duration_sym_{"?"};
 };
 
 ModiDump2Ly::ModiDump2Ly() {
@@ -360,6 +361,7 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
   curr_ts_bar_begin = 0;
   f_ly << fmt::format("  \\time {}\n ", time_sigs_[0].ly_str());
   curr_bar = 0;
+  curr_duration_sym_ = std::string("?");
   uint32_t prev_note_end_time = 0;
   const size_t n_notes = track.notes_.size();
   uint8_t key_last = 0;
@@ -407,13 +409,13 @@ void ModiDump2Ly::WriteKeyDuration(
   const std::string &sym,
   uint32_t tbegin,
   const uint32_t tend,
-  const bool use_ts) {
+  const bool wet) {
   const bool is_rest = (sym == std::string("r"));
   while (tbegin + small_time_ < tend) {
     const TimeSignature &ts = time_sigs_[time_sig_idx];
     const uint32_t small_add = is_rest ? small_time_ : 0;
     uint32_t et = tend;
-    if (use_ts) {
+    if (wet) {
       uint32_t curr_ts_bars = curr_bar - curr_ts_bar_begin;
       uint32_t end_of_bar = ts.abs_time_ + (curr_ts_bars + 1)*TsTicks(ts);
       if (tbegin + small_add >= end_of_bar) {
@@ -437,6 +439,9 @@ void ModiDump2Ly::WriteKeyDuration(
     uint32_t duration = (et - tbegin) + small_time_;
     while (duration >= 2*WholeTicks()) {
       f_ly << fmt::format(" {}1", sym);
+      if (wet) {
+        curr_duration_sym_ = "1";
+      }
       duration -= WholeTicks();
     }
     class QRule {
@@ -465,7 +470,12 @@ void ModiDump2Ly::WriteKeyDuration(
     for (const QRule &qrule: qrules) {
       const uint32_t delta = qrule.Delta(ticks_per_quarter_);
       if (duration >= delta) {
-        f_ly << fmt::format(" {}{}", sym, qrule.sym_);
+        std::string dur(wet ? "" : qrule.sym_);
+        if (wet && (curr_duration_sym_ != qrule.sym_)) {
+          dur = qrule.sym_;
+          curr_duration_sym_ = dur;
+        }
+        f_ly << fmt::format(" {}{}", sym, dur);
         duration -= delta;
       }
     }
