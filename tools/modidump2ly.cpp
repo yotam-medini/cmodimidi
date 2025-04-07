@@ -14,6 +14,8 @@ static const std::regex tpq_seg_regex(
 static const std::regex time_sig_regex(
   "^.*AT=(\\d++),.* "
   "TimeSignature\\(nn=(\\d+), dd=(\\d+), cc=(\\d+), bb=(\\d+)\\).*");
+static const std::regex tempo_sig_regex(
+  "^.*AT=(\\d++),.* Tempo\\((\\d+)\\).*");
 static const std::regex note_on_off_regex(
   "^.*AT=(\\d++),.* "
   "Note([Ofn]+)\\(channel=(\\d+), key=(\\d+), velocity=(\\d+)\\).*");
@@ -63,7 +65,20 @@ class TimeSignature {
 
 static const TimeSignature time_signature_initial{0, 4, 2, 24, 8}; // 24=0x18
 
-static constexpr uint8_t REST_KEY = 0xff;
+class Tempo {
+ public:
+  Tempo(uint32_t at=0, uint32_t tttttt=0) : abs_time_{at}, tttttt_{tttttt} {
+  }
+  Tempo(const std::smatch &base_match) :
+    Tempo(
+      std::stoi(base_match[1].str()),
+      std::stoi(base_match[2].str())) {
+  }
+  uint32_t abs_time_{0};
+  uint32_t tttttt_{0};
+};
+
+static const Tempo tempo_initial{0, 500000};
 
 class NoteBase {
  public:
@@ -178,6 +193,7 @@ class ModiDump2Ly {
   uint32_t ticks_per_quarter_{48};
   uint32_t small_time_{0};
   std::vector<TimeSignature> time_sigs_;
+  std::vector<Tempo> tempos_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
   size_t curr_ts_bar_begin{0};
@@ -255,6 +271,12 @@ int ModiDump2Ly::Parse() {
     }
     ifs.close();
   }
+  if (time_sigs_.empty()) {
+    time_sigs_.push_back(time_signature_initial);
+  }
+  if (tempos_.empty()) {
+    tempos_.push_back(tempo_initial);
+  }
   if (debug_ & 0x1) { std::cerr << "} end of Parse\n"; }
   return RC();
 }
@@ -289,10 +311,18 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
       } else if (std::regex_match(line, base_match, time_sig_regex)) {
         if (base_match.size() == 6) {
           TimeSignature ts(base_match);
-          if (time_sigs_.empty() && ts.abs_time_ > 0) {
+          if (time_sigs_.empty() && (ts.abs_time_ > 0)) {
             time_sigs_.push_back(time_signature_initial);
           }
           time_sigs_.push_back(std::move(ts));
+        }
+      } else if (std::regex_match(line, base_match, tempo_sig_regex)) {
+        if (base_match.size() == 2) {
+          Tempo tempo{base_match};
+          if (tempos_.empty() && (tempo.abs_time_ > 0)) {
+            tempos_.push_back(tempo_initial);
+          }
+          tempos_.push_back(std::move(tempo));
         }
       } else if (std::regex_match(line, base_match, note_on_off_regex)) {
         if (base_match.size() == 6) {
