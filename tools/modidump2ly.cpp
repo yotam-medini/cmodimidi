@@ -114,6 +114,9 @@ class Note : public NoteBase {
     NoteBase{at, channel, key}, end_time_{et} {
   }
   uint32_t Duration() const { return end_time_ - abs_time_; }
+  bool SameTime(const Note &other) const {
+    return (abs_time_ == other.abs_time_) && (end_time_ == other.end_time_);
+  }
   std::string str() const {
     return fmt::format("Note([{}, {}], c={}, key={}, v={})",
       abs_time_, end_time_, channel_, key_, value_);
@@ -121,11 +124,12 @@ class Note : public NoteBase {
   uint8_t value_{0};
   uint32_t end_time_;
 };
+using vnotes_t = std::vector<Note>;
 
 class Track {
  public:
    std::string name_{""};
-   std::vector<Note> notes_;
+   vnotes_t notes_;
 };
 
 class ModiDump2Ly {
@@ -150,6 +154,10 @@ class ModiDump2Ly {
     uint32_t tbegin,
     const uint32_t tend,
     const bool use_ts);
+  std::string GetChordSym(
+    const vnotes_t &notes,
+    size_t &ni,
+    uint8_t &key_last) const;
   std::string GetSymKey(uint8_t key, uint8_t key_last) const;
   bool IsNextTimeSig(uint32_t t) const {
     return ((time_sig_idx + 1 < time_sigs_.size()) && 
@@ -363,6 +371,8 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
         curr_bar + 1, time_sigs_[time_sig_idx].ly_str());
     }
     bool polyphony = false;
+    const uint8_t key_base = note.key_;
+    const std::string chord_sym = GetChordSym(track.notes_, ni, key_last);
     for ( ; (ni + 1 < n_notes) &&
       (track.notes_[ni + 1].abs_time_ < note.end_time_); ++ni) {
       if (!polyphony) {
@@ -375,9 +385,9 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
     if (polyphony) {
       f_ly << "\n ";
     }
-    const std::string key_sym = GetSymKey(note.key_, key_last);
-    WriteKeyDuration(f_ly, key_sym, note.abs_time_, note.end_time_, true);
-    key_last = note.key_;
+    // const std::string key_sym = GetSymKey(note.key_, key_last);
+    WriteKeyDuration(f_ly, chord_sym, note.abs_time_, note.end_time_, true);
+    key_last = key_base;
     prev_note_end_time = note.end_time_;
   }
   f_ly << "\n}\n";
@@ -464,6 +474,34 @@ void ModiDump2Ly::WriteKeyDuration(
     }
     tbegin = et;
   }
+}
+
+std::string ModiDump2Ly::GetChordSym(
+  const vnotes_t &notes,
+  size_t &ni,
+  uint8_t &key_last) const {
+  vnotes_t chord;
+  chord.push_back(notes[ni]);
+  while ((ni + 1 < notes.size()) && chord.front().SameTime(notes[ni + 1])) {
+    ++ni;
+    chord.push_back(notes[ni]);
+  }
+  std::sort(chord.begin(), chord.end(), [](const Note& n0, const Note &n1) {
+    return n0.key_ < n1.key_; });
+  uint8_t chord_key = notes[0].key_;
+  std::string sym = GetSymKey(chord_key, key_last);
+  key_last = chord_key;
+  if (chord.size() > 1) {
+    sym = fmt::format("<{}", sym);
+    for (size_t i = 1; i < chord.size(); ++i) {
+      uint8_t key_next = chord[i].key_;
+      std::string sym_next = GetSymKey(key_next, chord_key);
+      chord_key = key_next;
+      sym = fmt::format("{} {}", sym, sym_next);
+    }
+    sym.push_back('>');
+  }
+  return sym;
 }
 
 std::string ModiDump2Ly::GetSymKey(uint8_t key, uint8_t key_last) const {
