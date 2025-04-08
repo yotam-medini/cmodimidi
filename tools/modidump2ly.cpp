@@ -495,7 +495,7 @@ std::string ModiDump2Ly::GetChordSym(
   }
   std::sort(chord.begin(), chord.end(), [](const Note& n0, const Note &n1) {
     return n0.key_ < n1.key_; });
-  uint8_t chord_key = notes[0].key_;
+  uint8_t chord_key = chord[0].key_;
   std::string sym = GetSymKey(chord_key, key_last);
   key_last = chord_key;
   if (chord.size() > 1) {
