@@ -280,7 +280,7 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
     if (std::regex_match(line, base_match, tpq_seg_regex)) {
       if (base_match.size() == 2) {
         ticks_per_quarter_ = std::stoi(base_match[1].str());
-        small_time_ = ticks_per_quarter_ / 64;
+        small_time_ = ticks_per_quarter_ / 40;
       }
     }
     skip = (line.find("Track") != 0);
@@ -469,7 +469,7 @@ void ModiDump2Ly::WriteKeyDuration(
       QRule{1, 8, "32"}};
     for (const QRule &qrule: qrules) {
       const uint32_t delta = qrule.Delta(ticks_per_quarter_);
-      if (duration >= delta) {
+      if (duration + small_time_ >= delta) {
         std::string dur(wet ? "" : qrule.sym_);
         if (wet && (curr_duration_sym_ != qrule.sym_)) {
           dur = qrule.sym_;
