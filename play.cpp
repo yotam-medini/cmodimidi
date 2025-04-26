@@ -192,11 +192,11 @@ class Affine {
   Affine(const range_t& source, const range_t &target) :
     s0_{source[0]},
     t0_{target[0]},
-    ds_{uint32_t{source[1]} + 1 - s0_},
-    dt_{uint32_t{target[1]} + 1 - t0_} {
+    ds_{uint32_t{source[1]} - s0_},
+    dt_{uint32_t{target[1]} - t0_} {
   }
   uint8_t Map(uint8_t s) const {
-    uint32_t t = t0_ + ((uint32_t(s) - s0_)*ds_)/dt_;
+    uint32_t t = t0_ + (ds_ != 0 ? ((uint32_t(s) - s0_)*dt_)/ds_ : dt_/2);
     return static_cast<uint8_t>(t);
   }
  private:
@@ -601,11 +601,13 @@ uint8_t Player::MapVelocity(
     uint8_t itrack) const {
   uint8_t velocity = note_on->velocity_;
   auto iter = channels_velocity_map_.find(note_on->channel_);
-  if (iter == channels_velocity_map_.end()) {
-    iter = tracks_velocity_map_.find(itrack);
-  }
-  if (iter != tracks_velocity_map_.end()) {
+  if (iter != channels_velocity_map_.end()) {
     velocity = iter->second.Map(velocity);
+  } else {
+    iter = tracks_velocity_map_.find(itrack);
+    if (iter != tracks_velocity_map_.end()) {
+      velocity = iter->second.Map(velocity);
+    }
   }
   return velocity;
 }
