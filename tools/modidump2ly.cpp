@@ -165,6 +165,13 @@ class ModiDump2Ly {
   uint32_t TsTicks(const TimeSignature &ts) const {
     return ts.Ticks(ticks_per_quarter_);
   }
+  std::string remove_octave_shifts(std::string s) const {
+    s.erase(std::remove_if(
+      s.begin(), s.end(),
+      [&](char c) { return (c == '\'' || c == ','); }),
+      s.end());
+    return s;
+  }
   int rc_{0};
   po::options_description desc_; 
   po::variables_map vm_;
@@ -467,6 +474,9 @@ void ModiDump2Ly::WriteKeyDuration(
       QRule{1, 2, "8"},
       QRule{1, 4, "16"},
       QRule{1, 8, "32"}};
+    const char *connect = "";
+    const std::string sym_base = remove_octave_shifts(sym);
+    const std::string *sym_who = &sym;
     for (const QRule &qrule: qrules) {
       const uint32_t delta = qrule.Delta(ticks_per_quarter_);
       if (duration + small_time_ >= delta) {
@@ -475,7 +485,9 @@ void ModiDump2Ly::WriteKeyDuration(
           dur = qrule.sym_;
           curr_duration_sym_ = dur;
         }
-        f_ly << fmt::format(" {}{}", sym, dur);
+        f_ly << fmt::format(" {}{}{}", connect, *sym_who, dur);
+        connect = "~ ";
+        sym_who = &sym_base;
         duration -= delta;
       }
     }
