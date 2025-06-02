@@ -2,7 +2,6 @@
 #include <iostream>
 #include <fmt/core.h>
 #include <fluidsynth.h>
-// #include <fluidsynth/settings.h>
 
 SynthSequencer::SynthSequencer(
     const std::string &sound_font_path,
@@ -10,16 +9,22 @@ SynthSequencer::SynthSequencer(
     debug_{debug} {
   settings_ = new_fluid_settings();
   int fs_rc;
-  if (ok()) {
+  if (false && ok()) {
     fs_rc = fluid_settings_setint(settings_, "synth.reverb.active", 0);
     if (fs_rc != FLUID_OK) {
       error_ = fmt::format("setting reverb: failed rc={}", fs_rc);
     }
   }
-  if (ok()) {
+  if (false && ok()) {
     fs_rc = fluid_settings_setint(settings_, "synth.chorus.active", 0);
     if (fs_rc != FLUID_OK) {
       error_ = fmt::format("setting chorus: failed rc={}", fs_rc);
+    }
+  }
+  if (ok()) {
+    fs_rc = fluid_settings_setint(settings_, "audio.period-size", 512);
+    if (fs_rc != FLUID_OK) {
+      error_ = fmt::format("setting period-size: failed rc={}", fs_rc);
     }
   }
   if (ok()) {
