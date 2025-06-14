@@ -182,6 +182,7 @@ class ModiDump2Ly {
   bool flat_{false};
   uint32_t ticks_per_quarter_{48};
   uint32_t small_time_{0};
+  int bar_shift_{0};
   std::vector<TimeSignature> time_sigs_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
@@ -205,6 +206,8 @@ void ModiDump2Ly::SetOptions() {
       "Output in Lilypond format (required)")
     ("flat", po::bool_switch(&flat_)->default_value(false),
       "Prefer flats♭ to default sharps♯")
+    ("barshift", po::value<int>(&bar_shift_)->default_value(0),
+      "Shift bar numbers")
     ("debug", po::value<std::string>(&debug_raw_)->default_value("0"),
       "Debug flags (hex ok)")
   ;
@@ -386,7 +389,7 @@ void ModiDump2Ly::WriteTrackNotes(std::ofstream &f_ly, size_t ti) {
       ++time_sig_idx;
       curr_ts_bar_begin = curr_bar;
       f_ly << fmt::format("  % bar {}\n  \\time {}\n ",
-        curr_bar + 1, time_sigs_[time_sig_idx].ly_str());
+        curr_bar + 1 + bar_shift_, time_sigs_[time_sig_idx].ly_str());
     }
     bool polyphony = false;
     const uint8_t key_base = note.key_;
@@ -427,7 +430,7 @@ void ModiDump2Ly::WriteKeyDuration(
       uint32_t end_of_bar = ts.abs_time_ + (curr_ts_bars + 1)*TsTicks(ts);
       if (tbegin + small_add >= end_of_bar) {
          ++curr_bar;
-         f_ly << fmt::format("\n  % bar {}\n ", curr_bar + 1);
+         f_ly << fmt::format("\n  % bar {}\n ", curr_bar + 1 + bar_shift_);
          tbegin += small_add;
          if (IsNextTimeSig(tbegin)) {
            ++time_sig_idx;
