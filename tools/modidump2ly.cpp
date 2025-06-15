@@ -19,6 +19,7 @@ static const std::regex note_on_off_regex(
   "Note([Ofn]+)\\(channel=(\\d+), key=(\\d+), velocity=(\\d+)\\).*");
 static const std::regex track_name_regex(
   "^.*AT=.* SequenceTrackName\\((\\w+)\\).*");
+static const std::regex at_event_regex("^.*AT=(\\d++),.*");
 
 class TimeSignature {
  public:
@@ -59,6 +60,7 @@ class TimeSignature {
   uint8_t bb_{0};
   uint8_t denom_{4};
   uint32_t duration_ticks_{0};
+  uint32_t preceding_bars_{0};
 };
 
 static const TimeSignature time_signature_initial{0, 4, 2, 24, 8}; // 24=0x18
@@ -144,6 +146,7 @@ class ModiDump2Ly {
   }
   int Parse();
   bool GetTrack(std::istream &ifs);
+  void CompleteTimeSignatures();
   void WriteLyNotes();
   void WriteTrackNotes(std::ofstream &f_ly, size_t ti);
   void WriteKeyDuration(
@@ -183,6 +186,7 @@ class ModiDump2Ly {
   uint32_t ticks_per_quarter_{48};
   uint32_t small_time_{0};
   int bar_shift_{0};
+  uint32_t time_last_event_{0};
   std::vector<TimeSignature> time_sigs_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
@@ -272,9 +276,7 @@ int ModiDump2Ly::Parse() {
     }
     ifs.close();
   }
-  if (time_sigs_.empty()) {
-    time_sigs_.push_back(time_signature_initial);
-  }
+  CompleteTimeSignatures();
   if (debug_ & 0x1) { std::cerr << "} end of Parse\n"; }
   return RC();
 }
@@ -302,6 +304,12 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
     while (!((line.find("}") == 0) || ifs.eof())) {
       std::getline(ifs, line);
       std::smatch base_match;
+      if (std::regex_match(line, base_match, at_event_regex)) {
+        uint32_t event_time = std::stoi(base_match[1].str());
+        if (time_last_event_ < event_time) {
+          time_last_event_ = event_time;
+        }
+      }
       if (std::regex_match(line, base_match, track_name_regex)) {
         if (base_match.size() == 2) {
           track.name_ = base_match[1].str();
@@ -346,6 +354,27 @@ bool ModiDump2Ly::GetTrack(std::istream &ifs) {
     tracks_.push_back(std::move(track));
   }         
   return got;
+}
+
+void ModiDump2Ly::CompleteTimeSignatures() {
+  if (time_sigs_.empty()) {
+    time_sigs_.push_back(time_signature_initial);
+  }
+  time_sigs_.push_back(TimeSignature(time_last_event_));
+  for (size_t i0 = 0, i1 = 1; i1 < time_sigs_.size(); i0 = i1++) {
+    uint32_t ticks = time_sigs_[i1].abs_time_ - time_sigs_[i0].abs_time_;
+    uint32_t measure_ticks = time_sigs_[i0].Ticks(ticks_per_quarter_);
+    uint32_t bars = (ticks + (measure_ticks - 1)) / measure_ticks;
+    time_sigs_[i1].preceding_bars_ = time_sigs_[i0].preceding_bars_ + bars;
+    if (debug_ & 0x8) {
+      std::cerr << fmt::format("TS[{}] 0-bar={} {} residue={}\n", 
+        i0, time_sigs_[i0].preceding_bars_, time_sigs_[i0].ly_str(),
+        ticks % measure_ticks);
+    }
+  }
+  if (debug_ & 0x8) {
+    std::cerr << fmt::format("#(bars)={}\n", time_sigs_.back().preceding_bars_);
+  }
 }
 
 void ModiDump2Ly::WriteLyNotes() {
