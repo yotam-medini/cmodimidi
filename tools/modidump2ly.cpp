@@ -188,6 +188,7 @@ class ModiDump2Ly {
   int bar_shift_{0};
   uint32_t time_last_event_{0};
   std::vector<TimeSignature> time_sigs_;
+  std::vector<TimeSignature> time_sigs_split_;
   std::vector<Track> tracks_;
   size_t time_sig_idx{0};
   size_t curr_ts_bar_begin{0};
@@ -361,19 +362,43 @@ void ModiDump2Ly::CompleteTimeSignatures() {
     time_sigs_.push_back(time_signature_initial);
   }
   time_sigs_.push_back(TimeSignature(time_last_event_));
+  uint32_t preceding_split_bars{0};
   for (size_t i0 = 0, i1 = 1; i1 < time_sigs_.size(); i0 = i1++) {
     uint32_t ticks = time_sigs_[i1].abs_time_ - time_sigs_[i0].abs_time_;
-    uint32_t measure_ticks = time_sigs_[i0].Ticks(ticks_per_quarter_);
-    uint32_t bars = (ticks + (measure_ticks - 1)) / measure_ticks;
+    const uint32_t measure_ticks = time_sigs_[i0].Ticks(ticks_per_quarter_);
+    uint32_t whole_bars = ticks / measure_ticks;
+    uint32_t residue = ticks % measure_ticks;
+    uint32_t bars = whole_bars + (residue == 0 ? 0 : 1);
     time_sigs_[i1].preceding_bars_ = time_sigs_[i0].preceding_bars_ + bars;
     if (debug_ & 0x8) {
-      std::cerr << fmt::format("TS[{}] 0-bar={} {} residue={}\n", 
+      std::cerr << fmt::format("TS[{}] 0-bar={} {} AT={}, residue={}\n", 
         i0, time_sigs_[i0].preceding_bars_, time_sigs_[i0].ly_str(),
-        ticks % measure_ticks);
+        time_sigs_[i0].abs_time_, residue);
+    }
+    TimeSignature ts{time_sigs_[i0]};
+    if (whole_bars > 0) {
+      ts.preceding_bars_ = preceding_split_bars;
+      time_sigs_split_.push_back(ts);
+      preceding_split_bars += whole_bars;
+    }
+    if (residue > 0) {
+      ts.abs_time_ += whole_bars * measure_ticks;
+      ts.preceding_bars_ = preceding_split_bars++;
+      ts.nn_ = (residue * ts.nn_ + measure_ticks/2) / measure_ticks;
+      time_sigs_split_.push_back(ts);
     }
   }
+  TimeSignature ts_last{time_last_event_};
+  ts_last.preceding_bars_ = preceding_split_bars;
+  time_sigs_split_.push_back(ts_last);
   if (debug_ & 0x8) {
     std::cerr << fmt::format("#(bars)={}\n", time_sigs_.back().preceding_bars_);
+    for (size_t i = 0; i + 1 < time_sigs_split_.size(); ++i) {
+      std::cerr << fmt::format("Split-TS[{}] 0-bar={} {} AT={}\n", 
+        i, time_sigs_split_[i].preceding_bars_, time_sigs_split_[i].ly_str(),
+        time_sigs_split_[i].abs_time_);
+    }
+    std::cerr << fmt::format("#(split bars)={}\n", preceding_split_bars);
   }
 }
 
